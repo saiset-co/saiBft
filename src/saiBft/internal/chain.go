@@ -27,14 +27,14 @@ func (s *InternalService) listenFromSaiP2P() {
 		s.Logger.Fatal("wrong type of socket_port value in config")
 	}
 
-	socketServer, err := net.Listen("tcp", host+":"+fmt.Sprint(port))
+	socketServer, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
 	if err != nil {
 		s.Logger.Fatal("error creating socket connection", zap.Error(err))
 	}
 
 	defer socketServer.Close()
 
-	s.Logger.Sugar().Debug("chain (listening saiP2p socket) started on %s:%s", host, strconv.Itoa(port))
+	s.Logger.Sugar().Debugf("chain (listening saiP2p socket) started on %s:%s", host, strconv.Itoa(port))
 
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
@@ -132,7 +132,7 @@ func (s *InternalService) listenFromSaiP2P() {
 				continue
 			}
 
-			err = utils.ValidateSignature(msg, saiBtcAddress, msg.SenderAddress, msg.SenderSignature)
+			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Block.SenderAddress, msg.Block.SenderSignature)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
@@ -156,7 +156,7 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 		return err
 	}
 
-	err, result := DB.storage.Get(blockchainCollection, bson.M{"block_number": msg.BlockNumber}, bson.M{}, storageToken)
+	err, result := DB.storage.Get(blockchainCollection, bson.M{"number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
 		s.Logger.Error("handleBlockConsensusMsg - get block N ", zap.Error(err))
 		return err
@@ -165,7 +165,7 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 	s.Logger.Sugar().Debugf("got block consensus : %s\n", result)
 
 	if len(result) == 2 {
-		err = fmt.Errorf("block with number = %d was not found", msg.BlockNumber)
+		err = fmt.Errorf("block with number = %d was not found", msg.Block.Number)
 		s.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
 		return err
 
@@ -187,7 +187,7 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 
 	if block.BlockHash == msg.BlockHash {
 		block.Votes++
-		filter := bson.M{"block_number": block.BlockNumber}
+		filter := bson.M{"number": block.Block.Number}
 		update := bson.M{"votes": block.Votes}
 		err, _ = DB.storage.Update(blockchainCollection, filter, update, storageToken)
 		if err != nil {
@@ -234,7 +234,7 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 
 		blockCandidate.Votes++
 		if blockCandidate.Votes < block.Votes {
-			resultBlocks, err := s.sendDirectGetBlockMsg(block.BlockNumber)
+			resultBlocks, err := s.sendDirectGetBlockMsg(block.Block.Number)
 			if err != nil {
 				s.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
 				return err
@@ -305,7 +305,7 @@ func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMe
 		s.Logger.Fatal("wrong type of trusted_validators in config")
 	}
 	for _, validator := range trustedValidators {
-		if validator == msg.SenderAddress {
+		if validator == msg.Block.SenderAddress {
 			return true
 		}
 	}

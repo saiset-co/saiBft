@@ -10,7 +10,7 @@
   sai_crypto_address: "127.0.0.1:8085"
   storage_token: "12345"
   trusted_validators: ["address1",address2,"address3"]
-  sleep: 20s
+  sleep: 10
   storage_url: "http://127.0.0.1:8801"
   storage_email: "ddd@mial.com"
   storage_password: "fdfsdf"

@@ -1,0 +1,31 @@
+version: '3'
+services:
+
+  sai-bft:
+    build:
+      context: ./saiBft
+      dockerfile: Dockerfile
+    ports:
+      - "8017:8017"
+      - "8018:8018"
+      - "8019:8019"
+
+  sai-storage:
+    build:
+      context: ./saiStorage
+      dockerfile: Dockerfile
+    ports:
+      - "8801:8801"
+      - "8802:8802"
+
+  sai-btc:
+    build:
+      context: ./saiBTC
+      dockerfile: Dockerfile
+    ports:
+      - "3305:3305"
+    volumes:
+      - ./saiBft/build/config.yml:/srv/config.yml
+      - ./saiStorage/build/config.json:/srv/config.json
+      - ./saiBTC/build/saibtc.config:/srv/saibtc.config
+

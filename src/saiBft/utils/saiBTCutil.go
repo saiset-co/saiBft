@@ -101,28 +101,23 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 }
 
 // saiBTC sign message method
+// todo : way to encrypt message in signMessage method
 func SignMessage(msg interface{}, address, privateKey string) (resp *models.SignMessageResponse, err error) {
-	b := make([]byte, 0)
+	var preparedString string
 	switch msg.(type) {
 	case *models.BlockConsensusMessage:
-		b, err = json.Marshal(msg)
-		if err != nil {
-			return nil, fmt.Errorf(" marshal blockConsensusMessage : %w", err)
-		}
+		hash := msg.(*models.BlockConsensusMessage).BlockHash
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, hash)
 	case *models.ConsensusMessage:
-		b, err = json.Marshal(msg)
-		if err != nil {
-			return nil, fmt.Errorf("marshal ConsensusMessage : %w", err)
-		}
+		cMsg := msg.(*models.ConsensusMessage)
+		str := fmt.Sprintf("%s+%s+%d+%d", cMsg.Type, cMsg.SenderAddress, cMsg.Block, cMsg.Round)
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, str)
 	case *models.TransactionMessage:
-		b, err = json.Marshal(msg)
-		if err != nil {
-			return nil, fmt.Errorf("marshal TransactionMessage : %w", err)
-		}
+		hash := msg.(*models.TransactionMessage).MessageHash
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, hash)
 	default:
 		return nil, errors.New("unknown type of message")
 	}
-	preparedString := fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(b))
 	requestBody := strings.NewReader(preparedString)
 
 	body, err := sendRequest(address, requestBody)
@@ -132,9 +127,10 @@ func SignMessage(msg interface{}, address, privateKey string) (resp *models.Sign
 
 	response := models.SignMessageResponse{}
 
-	err = json.Unmarshal(body, &resp)
+	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal response from saiBTC  : %w\n response body : %s", err, string(body))
+		return nil, fmt.Errorf("unmarshal response from saiBTC  : %w\n response body : %", err, string(body))
 	}
+
 	return &response, nil
 }

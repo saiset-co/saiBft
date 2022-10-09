@@ -1,0 +1,16 @@
+  socket:
+    port: 8017
+  http:
+    enabled: true
+    port: 8018
+  ws:
+    enabled: true
+    port: 8019
+  test: "TEST"
+  sai_crypto_address: "127.0.0.1:8085"
+  storage_token: "ddddddd"
+  trusted_validators: ["address1",address2,"address3"]
+  sleep: 20
+  storage_url: "http://127.0.0.1:8084"
+  storage_email: "ddd@mial.com"
+  storage_password: "fdfsdf"

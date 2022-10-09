@@ -8,5 +8,5 @@ type SaiP2pNode struct {
 
 // request to get missed blocks from connected nodes
 type GetBlocksRequest struct {
-	LastBlockNumber int `json:"last_block_number"`
+	LastBlockNumber int `json:"number"`
 }

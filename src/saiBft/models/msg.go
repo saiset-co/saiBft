@@ -34,13 +34,17 @@ func (m *ConsensusMessage) Validate() error {
 
 // BlockConsensus message
 type BlockConsensusMessage struct {
-	Type              string `json:"type" valid:",required"`
-	BlockNumber       int    `json:"block" valid:",required"`
-	BlockHash         string `json:"block_hash" valid:",required"`
+	Type      string `json:"type" valid:",required"`
+	BlockHash string `json:"block_hash" valid:",required"`
+	Votes     int    `json:"votes"` // additional field, which was not added by Valeriy
+	Block     *Block `json:"block" valid:",required"`
+}
+
+type Block struct {
+	Number            int    `json:"number" valid:",required"`
 	PreviousBlockHash string `json:"prev_block_hash" valid:",required"`
 	SenderAddress     string `json:"sender_address" valid:",required"`
-	SenderSignature   string `json:"sender_signature" valid:",required"`
-	Votes             int    `json:"votes" valid:",required"` // additional field, which was not added by Valeriy
+	SenderSignature   string `json:"sender_signature,omitempty" valid:",required"`
 }
 
 // Validate block consensus message
@@ -51,6 +55,7 @@ func (m *BlockConsensusMessage) Validate() error {
 
 // Transaction message
 type TransactionMessage struct {
+	Type        string `json:"type" valid:",required"`
 	MessageHash string `json:"message_hash" valid:",required"`
 	Tx          *Tx    `json:"message" valid:",required"`
 	Votes       int    `json:"votes"` // additional field, which was not added by Valeriy
@@ -58,7 +63,6 @@ type TransactionMessage struct {
 
 //
 type Tx struct {
-	Type            string `json:"type" valid:",required"`
 	Block           int    `json:"block" valid:",required"`
 	VM              string `json:"vm" valid:",required"`
 	SenderAddress   string `json:"sender_address" valid:",required"`
