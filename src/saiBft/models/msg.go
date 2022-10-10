@@ -34,6 +34,7 @@ func (m *ConsensusMessage) Validate() error {
 
 // BlockConsensus message
 type BlockConsensusMessage struct {
+	ID        string `json:"-"`
 	Type      string `json:"type" valid:",required"`
 	BlockHash string `json:"block_hash" valid:",required"`
 	Votes     int    `json:"votes"` // additional field, which was not added by Valeriy

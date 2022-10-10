@@ -81,7 +81,7 @@ func (s *InternalService) Processing() {
 	for {
 		round := 0
 	startLoop:
-		s.Logger.Sugar().Debugf("new round started, current round = %d", round)
+		s.Logger.Debug("start loop,round = 0")
 		time.Sleep(5 * time.Second) //todo : for testing
 		block := &models.BlockConsensusMessage{}
 
@@ -102,20 +102,28 @@ func (s *InternalService) Processing() {
 
 			s.Logger.Sugar().Debugf("First block created : %+v\n", block) //DEBUG
 		} else {
+			blocks := make([]*models.BlockConsensusMessage, 0)
 			data, err := utils.ExtractResult(result)
 			if err != nil {
 				Service.Logger.Error("process - get last block from blockchain - extract data from response", zap.Error(err))
 				continue
 			}
-			err = json.Unmarshal(data, &block)
+			s.Logger.Sugar().Debugf("get last block data : %s", string(data))
+			err = json.Unmarshal(data, &blocks)
 			if err != nil {
 				s.Logger.Error("handlers - process - unmarshal result of last block from blockchain collection", zap.Error(err))
 				continue
 			}
+			block = blocks[0]
 			s.Logger.Sugar().Debugf("Got last block from blockchain collection : %+v\n", block) //DEBUG
 		}
 
 	checkRound:
+
+		//todo : for tests
+		time.Sleep(5 * time.Second)
+
+		s.Logger.Sugar().Debugf("ROUND = %d", round)
 		if round == 0 {
 			// get messages with votes = 0
 			transactions, err := s.getZeroVotedTransactions(storageToken)
@@ -141,17 +149,15 @@ func (s *InternalService) Processing() {
 				consensusMsg.Messages = append(consensusMsg.Messages, tx.MessageHash)
 			}
 
-			s.Logger.Sugar().Debugf("signing consensus message: %+v\n", consensusMsg) //DEBUG
-
 			btcResp, err := utils.SignMessage(consensusMsg, saiBtcAddress, s.BTCkeys.Private)
 			if err != nil {
 				s.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
 				goto startLoop
 			}
 
-			s.Logger.Sugar().Debugf(" consensus message  signature: %+v\n", btcResp) //DEBUG
-
 			consensusMsg.Signature = btcResp.Signature
+
+			s.Logger.Sugar().Debugf(" consensus message to broadcast: %+v\n", consensusMsg) //DEBUG
 
 			err = s.broadcastMsg(consensusMsg)
 			if err != nil {
@@ -159,33 +165,33 @@ func (s *InternalService) Processing() {
 				goto startLoop
 			}
 
-			sleepTime, ok := s.GlobalService.Configuration["sleep"].(int)
-			if !ok {
-				s.Logger.Fatal("wront type of sleep param in config")
-			}
-
-			time.Sleep(time.Duration(sleepTime) * time.Second)
+			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
 
 			round++
 
-			if round <= maxRoundNumber {
-				goto checkRound
-			} else {
-				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken)
-				if err != nil {
-					continue
-				}
-				err = s.broadcastMsg(newBlock)
-				if err != nil {
-					continue
-				}
-			}
+			goto checkRound
 
 		} else {
 			// get consensus messages for the round
 			msgs, err := s.getConsensusMsgForTheRound(round, storageToken)
 			if err != nil {
-				continue
+				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
+				round++
+
+				if round <= maxRoundNumber {
+					goto checkRound
+				} else {
+					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken)
+					if err != nil {
+						continue
+					}
+					err = s.broadcastMsg(newBlock)
+					if err != nil {
+						continue
+					}
+					round = 0
+					goto startLoop
+				}
 			}
 			// update votes for each transaction msg from consensus msg
 			for _, msg := range msgs {
@@ -208,7 +214,23 @@ func (s *InternalService) Processing() {
 		// get messages with votes>=(roundNumber*10)%
 		txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 		if err != nil {
-			continue
+			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
+			round++
+
+			if round <= maxRoundNumber {
+				goto checkRound
+			} else {
+				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken)
+				if err != nil {
+					continue
+				}
+				err = s.broadcastMsg(newBlock)
+				if err != nil {
+					continue
+				}
+				round = 0
+				goto startLoop
+			}
 		}
 		newConsensusMsg := &models.ConsensusMessage{
 			Type:          models.ConsensusMsgType,
@@ -235,7 +257,6 @@ func (s *InternalService) Processing() {
 		}
 
 		time.Sleep(s.GlobalService.Configuration["sleep"].(time.Duration) * time.Second)
-
 		round++
 
 		if round <= maxRoundNumber {
@@ -249,6 +270,9 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				continue
 			}
+
+			round = 0
+			goto startLoop
 
 		}
 	}
@@ -271,7 +295,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 		Type:  models.BlockConsensusMsgType,
 		Votes: 0,
 		Block: &models.Block{
-			Number:            1,
+			Number:            0,
 			SenderAddress:     s.BTCkeys.Address,
 			PreviousBlockHash: "",
 		},
@@ -367,6 +391,12 @@ func (s *InternalService) getConsensusMsgForTheRound(round int, storageToken str
 		return nil, err
 	}
 
+	if len(result) == 2 {
+		err = fmt.Errorf("no consensusMsg found for round : %d", round)
+		s.Logger.Error("process - get consensusMsg for round", zap.Int("round", round), zap.Error(err))
+		return nil, err
+	}
+
 	data, err := utils.ExtractResult(result)
 	if err != nil {
 		Service.Logger.Error("process - getConsensusMsgForTheRound - extract data from response", zap.Error(err))
@@ -435,12 +465,12 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 		},
 	}
 
-	btcResp, err := utils.SignMessage(newBlock.Block, saiBTCaddress, s.BTCkeys.Private)
+	btcResp, err := utils.SignMessage(newBlock, saiBTCaddress, s.BTCkeys.Private)
+
 	if err != nil {
-		if err != nil {
-			s.Logger.Error("process - round != 0 - form and save new block - sing message", zap.Error(err))
-			return nil, err
-		}
+		s.Logger.Error("process - round != 0 - form and save new block - sign message", zap.Error(err))
+		return nil, err
+
 	}
 
 	newBlock.Votes = +1
@@ -481,7 +511,7 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 	filterGte := bson.M{"votes": bson.M{"$gte": requiredVotes}}
 	err, result := DB.storage.Get("MessagesPool", filterGte, bson.M{}, storageToken)
 	if err != nil {
-		s.Logger.Error("handlers - process - round != 0 - get tx messages with specified votes count", zap.Error(err))
+		s.Logger.Error("handlers - process - round != 0 - get tx messages with specified votes count", zap.Float64("votes count", requiredVotes), zap.Error(err))
 		return nil, err
 	}
 
