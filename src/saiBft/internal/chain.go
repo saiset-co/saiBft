@@ -254,12 +254,14 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 	}
 }
 
-// todo : на приконечненные ноды отправляем сообщение
+// todo : handler на получение этих сообщений
+//на приконечненные ноды отправляем сообщение
 /// сформируейте все блоки от такого до такого, которые у меня пропущены
 // how to find out, which blocks i have missed
 //  simple : get block from [0:N]  from another connected votes
 // получение блоков сортировка по номеру, ограничение по количеству
 // broadcast messages to connected nodes
+//
 func (s *InternalService) sendDirectGetBlockMsg(blockNumber int) (resultBlocks []*models.BlockConsensusMessage, err error) {
 
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
@@ -272,15 +274,16 @@ func (s *InternalService) sendDirectGetBlockMsg(blockNumber int) (resultBlocks [
 			continue
 		}
 
-		// todo : ask about algorhytm to compare missed blocks from connected nodes
 		for i, block := range blocks {
-			comparedBlock, ok := tempMap[i]
+			comparedBlock, ok := tempMap[block.Block.Number]
 			if !ok {
-				tempMap[i] = block
+				tempMap[block.Block.Number] = block
 			} else {
 				if comparedBlock.BlockHash == block.BlockHash {
 					continue
 				} else {
+					// блок приходит без голоса, выбираем по большинству (если больше трех)
+					// ждем большинства, не принимаем блок, если равенство
 					if block.Votes > comparedBlock.Votes {
 						tempMap[i] = block
 					} else {

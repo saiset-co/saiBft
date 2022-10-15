@@ -40,22 +40,22 @@ func sendRequest(address string, requestBody io.Reader) ([]byte, error) {
 }
 
 // get btc keys
-func GetBtcKeys(address string) (*models.BtcKeys, error) {
+func GetBtcKeys(address string) (*models.BtcKeys, []byte, error) {
 	requestBody := strings.NewReader("method=generateBTC")
 
 	body, err := sendRequest(address, requestBody)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	keys := models.BtcKeys{}
 
 	err = json.Unmarshal(body, &keys)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return &keys, nil
+	return &keys, body, nil
 }
 
 // validate message signature
@@ -101,20 +101,30 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 }
 
 // saiBTC sign message method
-// todo : way to encrypt message in signMessage method
 func SignMessage(msg interface{}, address, privateKey string) (resp *models.SignMessageResponse, err error) {
 	var preparedString string
 	switch msg.(type) {
 	case *models.BlockConsensusMessage:
-		hash := msg.(*models.BlockConsensusMessage).BlockHash
-		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, hash)
+		BCMsg := msg.(*models.BlockConsensusMessage)
+		data, err := json.Marshal(BCMsg)
+		if err != nil {
+			return nil, err
+		}
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
 	case *models.ConsensusMessage:
 		cMsg := msg.(*models.ConsensusMessage)
-		str := fmt.Sprintf("%s+%s+%d+%d", cMsg.Type, cMsg.SenderAddress, cMsg.Block, cMsg.Round)
-		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, str)
+		data, err := json.Marshal(cMsg)
+		if err != nil {
+			return nil, err
+		}
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
 	case *models.TransactionMessage:
-		hash := msg.(*models.TransactionMessage).MessageHash
-		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, hash)
+		TxMsg := msg.(*models.TransactionMessage)
+		data, err := json.Marshal(TxMsg)
+		if err != nil {
+			return nil, err
+		}
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
 	default:
 		return nil, errors.New("unknown type of message")
 	}
@@ -129,7 +139,7 @@ func SignMessage(msg interface{}, address, privateKey string) (resp *models.Sign
 
 	err = json.Unmarshal(body, &response)
 	if err != nil {
-		return nil, fmt.Errorf("unmarshal response from saiBTC  : %w\n response body : %", err, string(body))
+		return nil, fmt.Errorf("unmarshal response from saiBTC  : %w\n response body : %s", err, string(body))
 	}
 
 	return &response, nil

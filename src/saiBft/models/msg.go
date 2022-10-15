@@ -56,13 +56,16 @@ func (m *BlockConsensusMessage) Validate() error {
 
 // Transaction message
 type TransactionMessage struct {
-	Type        string `json:"type" valid:",required"`
-	MessageHash string `json:"message_hash" valid:",required"`
-	Tx          *Tx    `json:"message" valid:",required"`
-	Votes       int    `json:"votes"` // additional field, which was not added by Valeriy
+	Type        string      `json:"type" valid:",required"`
+	MessageHash string      `json:"message_hash" valid:",required"`
+	Tx          *Tx         `json:"message" valid:",required"`
+	Votes       int         `json:"votes"` // additional field, which was not added by Valeriy
+	VmProcessed bool        `json:"vm_processed"`
+	VmResult    string      `json:"vm_result"`
+	VmResponse  interface{} `json:"vm_response"`
 }
 
-//
+// transaction struct
 type Tx struct {
 	Block           int    `json:"block" valid:",required"`
 	VM              string `json:"vm" valid:",required"`
@@ -75,4 +78,9 @@ type Tx struct {
 func (m *TransactionMessage) Validate() error {
 	_, err := valid.ValidateStruct(m)
 	return err
+}
+
+type GetBlockMsg struct {
+	BCMessage        *BlockConsensusMessage `json:"block_consensus"`
+	EqualHashesCount int
 }

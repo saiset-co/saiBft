@@ -1,10 +1,18 @@
 package models
 
+import valid "github.com/asaskevich/govalidator"
+
 // btc keys got from saiBTC
 type BtcKeys struct {
-	Private string `json:"Private"`
-	Public  string `json:"Public"`
-	Address string `json:"Address"`
+	Private string `json:"Private" valid:",required"`
+	Public  string `json:"Public" valid:",required"`
+	Address string `json:"Address" valid:",required"`
+}
+
+// Validate block consensus message
+func (m *BtcKeys) Validate() error {
+	_, err := valid.ValidateStruct(m)
+	return err
 }
 
 // validate signature response from saiBTC
