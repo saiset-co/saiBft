@@ -34,11 +34,13 @@ func (m *ConsensusMessage) Validate() error {
 
 // BlockConsensus message
 type BlockConsensusMessage struct {
-	ID        string `json:"-"`
-	Type      string `json:"type" valid:",required"`
-	BlockHash string `json:"block_hash" valid:",required"`
-	Votes     int    `json:"votes"` // additional field, which was not added by Valeriy
-	Block     *Block `json:"block" valid:",required"`
+	ID         string   `json:"-"`
+	Type       string   `json:"type" valid:",required"`
+	BlockHash  string   `json:"block_hash" valid:",required"`
+	Votes      int      `json:"votes"` // additional field, which was not added by Valeriy
+	Block      *Block   `json:"block" valid:",required"`
+	Count      int      `json:"-"` // extended value for consensu while get missed blocks from p2p services
+	Signatures []string `json:"voted_signatures"`
 }
 
 type Block struct {

@@ -1,13 +1,11 @@
 package internal
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
-	"net"
-	"strconv"
+	"reflect"
+	"sort"
 
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
@@ -16,25 +14,10 @@ import (
 )
 
 // listening for messages from saiP2P
-func (s *InternalService) listenFromSaiP2P() {
-	host, ok := s.GlobalService.Configuration["socket_host"].(string)
-	if !ok {
-		s.Logger.Fatal("wrong type of socket_host value in config")
-	}
 
-	port, ok := s.GlobalService.Configuration["socket_port"].(int)
-	if !ok {
-		s.Logger.Fatal("wrong type of socket_port value in config")
-	}
+func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 
-	socketServer, err := net.Listen("tcp", fmt.Sprintf("%s:%d", host, port))
-	if err != nil {
-		s.Logger.Fatal("error creating socket connection", zap.Error(err))
-	}
-
-	defer socketServer.Close()
-
-	s.Logger.Sugar().Debugf("chain (listening saiP2p socket) started on %s:%s", host, strconv.Itoa(port))
+	s.Logger.Debug("saiP2P listener started")
 
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
@@ -47,26 +30,31 @@ func (s *InternalService) listenFromSaiP2P() {
 	}
 
 	for {
-		msg := make(map[string]interface{})
-		conn, err := socketServer.Accept()
-		if err != nil {
-			s.Logger.Error("listenFromSaiP2P - accept from connection", zap.Error(err))
-			continue
-		}
-		var buf bytes.Buffer
-		io.Copy(&buf, conn)
 
-		err = json.Unmarshal(buf.Bytes(), &msg)
-		if err != nil {
-			Service.Logger.Error("listenFromSaiP2P  - unmarshal incoming bytes", zap.Error(err))
-			continue
-		}
+		data := <-s.MsgQueue
+		t := reflect.TypeOf(data)
+		s.Logger.Sugar().Debugf("type of incoming object : %+v", t) //DEBUG
 
-		switch msg["type"] {
+		m := data.(map[string]interface{})
+		// err := json.Unmarshal(data, &m)
+		// if err != nil {
+		// 	Service.Logger.Error("listenFromSaiP2P  - unmarshal incoming bytes", zap.Error(err))
+		// 	continue
+		// }
+
+		s.Logger.Sugar().Debugf("type of incoming msg : %s", m["type"]) //DEBUG
+
+		switch m["type"] {
 		// send message to ConsensusPool collection
 		case models.ConsensusMsgType:
+			jsonData, err := json.Marshal(m)
+			if err != nil {
+				Service.Logger.Error("listenFromSaiP2P - consensusMsg - marshal", zap.Error(err))
+				continue
+			}
 			msg := models.ConsensusMessage{}
-			err = json.Unmarshal(buf.Bytes(), &msg)
+
+			err = json.Unmarshal(jsonData, &msg)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - consensusMsg - unmarshal", zap.Error(err))
 				continue
@@ -77,7 +65,7 @@ func (s *InternalService) listenFromSaiP2P() {
 				continue
 			}
 
-			err = utils.ValidateSignature(msg, saiBtcAddress, msg.SenderAddress, msg.Signature)
+			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.SenderAddress, msg.Signature)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
@@ -92,8 +80,14 @@ func (s *InternalService) listenFromSaiP2P() {
 
 		// send message to MessagesPool collection
 		case models.TransactionMsgType:
+			jsonData, err := json.Marshal(m)
+			if err != nil {
+				Service.Logger.Error("listenFromSaiP2P - transactionMsg - marshal", zap.Error(err))
+				continue
+			}
 			msg := models.TransactionMessage{}
-			err = json.Unmarshal(buf.Bytes(), &msg)
+
+			err = json.Unmarshal(jsonData, &msg)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - transactionMsg - unmarshal", zap.Error(err))
 				continue
@@ -104,7 +98,7 @@ func (s *InternalService) listenFromSaiP2P() {
 				continue
 			}
 
-			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
+			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
@@ -120,8 +114,14 @@ func (s *InternalService) listenFromSaiP2P() {
 
 		// handle BlockConsensusMsg
 		case models.BlockConsensusMsgType:
+			jsonData, err := json.Marshal(m)
+			if err != nil {
+				Service.Logger.Error("listenFromSaiP2P - blockConsensusMsg - marshal", zap.Error(err))
+				continue
+			}
 			msg := models.BlockConsensusMessage{}
-			err = json.Unmarshal(buf.Bytes(), &msg)
+
+			err = json.Unmarshal(jsonData, &msg)
 			if err != nil {
 				Service.Logger.Error("listenFromSaiP2P - blockConsensusMsg - unmarshal", zap.Error(err))
 				continue
@@ -132,22 +132,25 @@ func (s *InternalService) listenFromSaiP2P() {
 				continue
 			}
 
-			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Block.SenderAddress, msg.Block.SenderSignature)
+			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.Block.SenderAddress, msg.Block.SenderSignature)
 			if err != nil {
-				Service.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
+				Service.Logger.Error("listenFromSaiP2P - blockConsensusMsg - validate signature ", zap.Error(err))
 				continue
 			}
 
-			err := s.handleBlockConsensusMsg(storageToken, &msg)
+			err = s.handleBlockConsensusMsg(saiBTCaddress, storageToken, &msg)
 			if err != nil {
 				continue
 			}
+		default:
+			Service.Logger.Error("listenFromSaiP2P - blockConsensusMsg - wrong message type to handle")
+			continue
 		}
 	}
 }
 
 // handle BlockConsensusMsg
-func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *models.BlockConsensusMessage) error {
+func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken string, msg *models.BlockConsensusMessage) error {
 	isValid := s.validateBlockConsensusMsg(msg)
 
 	if !isValid {
@@ -156,7 +159,7 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 		return err
 	}
 
-	err, result := DB.storage.Get(blockchainCollection, bson.M{"number": msg.Block.Number}, bson.M{}, storageToken)
+	err, result := DB.storage.Get(blockchainCollection, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
 		s.Logger.Error("handleBlockConsensusMsg - get block N ", zap.Error(err))
 		return err
@@ -168,7 +171,6 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 		err = fmt.Errorf("block with number = %d was not found", msg.Block.Number)
 		s.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
 		return err
-
 	}
 
 	data, err := utils.ExtractResult(result)
@@ -186,9 +188,17 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 	}
 
 	if block.BlockHash == msg.BlockHash {
+
+		// resp, err := utils.SignMessage(msg, saiBTCaddress, s.BTCkeys.Private)
+		// if err != nil {
+		// 	s.Logger.Error("handleBlockConsensusMsg - sign message", zap.Error(err))
+		// 	return err
+		// }
+		// todo : which signature to add?
+		block.Signatures = append(block.Signatures, block.Block.SenderSignature)
 		block.Votes++
 		filter := bson.M{"number": block.Block.Number}
-		update := bson.M{"votes": block.Votes}
+		update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
 		err, _ = DB.storage.Update(blockchainCollection, filter, update, storageToken)
 		if err != nil {
 			s.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update votes in storage", zap.Error(err))
@@ -233,6 +243,8 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 		s.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate)
 
 		blockCandidate.Votes++
+		// todo : which signature to add?
+		blockCandidate.Signatures = append(blockCandidate.Signatures, blockCandidate.Block.SenderSignature)
 		if blockCandidate.Votes < block.Votes {
 			resultBlocks, err := s.sendDirectGetBlockMsg(block.Block.Number)
 			if err != nil {
@@ -254,63 +266,58 @@ func (s *InternalService) handleBlockConsensusMsg(storageToken string, msg *mode
 	}
 }
 
-// todo : handler на получение этих сообщений
-//на приконечненные ноды отправляем сообщение
-/// сформируейте все блоки от такого до такого, которые у меня пропущены
-// how to find out, which blocks i have missed
-//  simple : get block from [0:N]  from another connected votes
-// получение блоков сортировка по номеру, ограничение по количеству
-// broadcast messages to connected nodes
-//
-func (s *InternalService) sendDirectGetBlockMsg(blockNumber int) (resultBlocks []*models.BlockConsensusMessage, err error) {
-
+func (s *InternalService) sendDirectGetBlockMsg(lastBlockNumber int) (resultBlocks []*models.BlockConsensusMessage, err error) {
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
-	tempMap := make(map[int]*models.BlockConsensusMessage)
+	tempMap := make(map[*models.BlockConsensusMessage]int)
 
 	for _, node := range s.ConnectedSaiP2pNodes {
-		blocks, err := utils.SendDirectGetBlockMsg(node.Address, blockNumber)
+		blocks, err := utils.SendDirectGetBlockMsg(node.Address, lastBlockNumber)
 		if err != nil {
 			s.Logger.Error("chain - send direct get block message", zap.String("node", node.Address), zap.Error(err))
 			continue
 		}
+		for _, b := range blocks {
+			tempMap[b]++
+		}
+	}
+	resultBlocks = make([]*models.BlockConsensusMessage, 0)
 
-		for i, block := range blocks {
-			comparedBlock, ok := tempMap[block.Block.Number]
-			if !ok {
-				tempMap[block.Block.Number] = block
-			} else {
-				if comparedBlock.BlockHash == block.BlockHash {
-					continue
-				} else {
-					// блок приходит без голоса, выбираем по большинству (если больше трех)
-					// ждем большинства, не принимаем блок, если равенство
-					if block.Votes > comparedBlock.Votes {
-						tempMap[i] = block
-					} else {
-						continue
-					}
-				}
+	for i := 1; i <= lastBlockNumber; i++ {
+		sliceToSort := make([]*models.BlockConsensusMessage, 0)
+		for k, v := range tempMap {
+			if k.Block.Number == i {
+				sliceToSort = append(sliceToSort, &models.BlockConsensusMessage{
+					Count: v,
+					Block: k.Block,
+				})
+			}
+		}
+		sort.Slice(sliceToSort, func(i, j int) bool {
+			return sliceToSort[i].Count > sliceToSort[j].Count
+		})
+		if len(sliceToSort) == 1 {
+			resultBlocks = append(resultBlocks, sliceToSort[0])
+		} else {
+			if sliceToSort[0].Count != sliceToSort[1].Count {
+				resultBlocks = append(resultBlocks, sliceToSort[0])
 			}
 		}
 	}
-
-	for _, block := range tempMap {
-		resultBlocks = append(resultBlocks, block)
-	}
-
 	return resultBlocks, nil
 }
 
 // validate block consensus message
 func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMessage) bool {
-	trustedValidators, ok := s.GlobalService.Configuration["trusted_validators"].([]string)
-	if !ok {
-		s.Logger.Fatal("wrong type of trusted_validators in config")
-	}
-	for _, validator := range trustedValidators {
+	// trustedValidators, ok := s.GlobalService.Configuration["trusted_validators"].([]string)
+	// if !ok {
+	// 	s.Logger.Fatal("wrong type of trusted_validators in config")
+	// }
+	for _, validator := range s.TrustedValidators {
 		if validator == msg.Block.SenderAddress {
 			return true
 		}
 	}
+
+	// todo : dummy response for test
 	return false
 }

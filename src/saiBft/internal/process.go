@@ -27,18 +27,28 @@ const (
 
 // main process of blockchain
 func (s *InternalService) Processing() {
-
-	go s.listenFromSaiP2P()
-
-	s.Logger.Sugar().Debugf("starting processing") //DEBUG
-
 	saiBtcAddress, ok := s.GlobalService.Configuration["saiBTC_address"].(string)
 	if !ok {
 		s.Logger.Fatal("processing - wrong type of saiBTC address value from config")
 	}
 
-	s.getBTCkeys(saiBtcAddress)
+	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
+	if !ok {
+		s.Logger.Fatal("processing - wrong type of saiP2P address value from config")
+	}
 
+	go s.listenFromSaiP2P(saiBtcAddress)
+
+	s.Logger.Sugar().Debugf("starting processing") //DEBUG
+
+	// for tests
+	btcKeys1, _ := s.getBTCkeys("btc_keys3.json", saiBtcAddress)
+	btcKeys2, _ := s.getBTCkeys("btc_keys2.json", saiBtcAddress)
+	btcKeys3, _ := s.getBTCkeys("btc_keys1.json", saiBtcAddress)
+	s.TrustedValidators = append(s.TrustedValidators, btcKeys1.Address, btcKeys2.Address, btcKeys3.Address)
+
+	btckeys, _ := s.getBTCkeys("btc_keys.json", saiBtcAddress)
+	s.BTCkeys = btckeys
 	s.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
 
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
@@ -46,36 +56,39 @@ func (s *InternalService) Processing() {
 		s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
 	}
 
-	trustedValidorsInterface, ok := s.GlobalService.Configuration["trusted_validators"].([]interface{})
-	if !ok {
-		s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
-	}
+	// get trusted validators from config
 
-	for _, validator := range trustedValidorsInterface {
-		s.TrustedValidators = append(s.TrustedValidators, validator.(string))
+	// trustedValidorsInterface, ok := s.GlobalService.Configuration["trusted_validators"].([]interface{})
+	// if !ok {
+	// 	s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
+	// }
 
-	}
+	// for _, validator := range trustedValidorsInterface {
+	// 	s.TrustedValidators = append(s.TrustedValidators, validator.(string))
+
+	// }
+
 	s.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
 
 	//insert transaction for test purposes
-	testTxMsg := &models.TransactionMessage{
-		Type:        models.TransactionMsgType,
-		MessageHash: "d23r2fsd",
-		Votes:       0,
-		Tx: &models.Tx{
-			Block:           1,
-			VM:              "ffff",
-			SenderAddress:   s.BTCkeys.Address,
-			Message:         "fsdfdsf",
-			SenderSignature: "dsg34",
-		},
-	}
+	// testTxMsg := &models.TransactionMessage{
+	// 	Type:        models.TransactionMsgType,
+	// 	MessageHash: "d23r2fsd",
+	// 	Votes:       0,
+	// 	Tx: &models.Tx{
+	// 		Block:           1,
+	// 		VM:              "ffff",
+	// 		SenderAddress:   s.BTCkeys.Address,
+	// 		Message:         "fsdfdsf",
+	// 		SenderSignature: "dsg34",
+	// 	},
+	// }
 
-	err, _ := DB.storage.Put("MessagesPool", testTxMsg, storageToken)
-	if err != nil {
-		s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
-	}
-	s.Logger.Sugar().Debugf("test tx message saved") //DEBUG
+	// err, _ := DB.storage.Put("MessagesPool", testTxMsg, storageToken)
+	// if err != nil {
+	// 	s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
+	// }
+	// s.Logger.Sugar().Debugf("test tx message saved") //DEBUG
 
 	for {
 		round := 0
@@ -83,7 +96,7 @@ func (s *InternalService) Processing() {
 		s.Logger.Debug("start loop,round = 0")
 
 		// for testing purposes
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 
 		block := &models.BlockConsensusMessage{}
 
@@ -123,7 +136,7 @@ func (s *InternalService) Processing() {
 	checkRound:
 
 		// for testing purposes
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 
 		s.Logger.Sugar().Debugf("ROUND = %d", round)
 		if round == 0 {
@@ -139,7 +152,7 @@ func (s *InternalService) Processing() {
 			}
 
 			for _, tx := range transactions {
-				err = s.validateExecuteTransactionMsg(tx, storageToken)
+				err = s.validateExecuteTransactionMsg(tx, saiBtcAddress, storageToken)
 				if err != nil {
 					continue
 				}
@@ -156,9 +169,7 @@ func (s *InternalService) Processing() {
 
 			consensusMsg.Signature = btcResp.Signature
 
-			s.Logger.Sugar().Debugf(" consensus message to broadcast: %+v\n", consensusMsg) //DEBUG
-
-			err = s.broadcastMsg(consensusMsg)
+			err = s.broadcastMsg(consensusMsg, saiP2Paddress)
 			if err != nil {
 				s.Logger.Error("process - round==0 - broadcast consensus message", zap.Error(err))
 				goto startLoop
@@ -184,7 +195,9 @@ func (s *InternalService) Processing() {
 					if err != nil {
 						continue
 					}
-					err = s.broadcastMsg(newBlock)
+
+					s.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
+					err = s.broadcastMsg(newBlock, saiP2Paddress)
 					if err != nil {
 						continue
 					}
@@ -224,7 +237,8 @@ func (s *InternalService) Processing() {
 				if err != nil {
 					continue
 				}
-				err = s.broadcastMsg(newBlock)
+				s.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
+				err = s.broadcastMsg(newBlock, saiP2Paddress)
 				if err != nil {
 					continue
 				}
@@ -251,7 +265,7 @@ func (s *InternalService) Processing() {
 
 		newConsensusMsg.Signature = btcResp.Signature
 
-		err = s.broadcastMsg(newConsensusMsg)
+		err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
 		if err != nil {
 			continue
 		}
@@ -266,7 +280,8 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				continue
 			}
-			err = s.broadcastMsg(newBlock)
+			s.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
+			err = s.broadcastMsg(newBlock, saiP2Paddress)
 			if err != nil {
 				continue
 			}
@@ -280,7 +295,7 @@ func (s *InternalService) Processing() {
 
 // get last block from blockchain collection
 func (s *InternalService) getLastBlockFromBlockChain(storageToken string) ([]byte, error) {
-	opts := options.Find().SetSort(bson.M{"BlockNumber": -1}).SetLimit(1)
+	opts := options.Find().SetSort(bson.M{"block.number": -1}).SetLimit(1)
 	err, result := DB.storage.Get(blockchainCollection, bson.M{}, opts, storageToken)
 	if err != nil {
 		s.Logger.Error("handlers - process - processing - get last block", zap.Error(err))
@@ -350,9 +365,13 @@ func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*mode
 	return transactions, nil
 }
 
-// validate/execute each message, update message nad the hash and vote for valid messages
-func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionMessage, storageToken string) error {
-
+// validate/execute each message, update message and hash and vote for valid messages
+func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionMessage, saiBTCaddress, storageToken string) error {
+	err := utils.ValidateSignature(msg, saiBTCaddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
+	if err != nil {
+		Service.Logger.Error("process - ValidateExecuteTransactionMsg - validate tx msg signature", zap.Error(err))
+		return err
+	}
 	// dummy vm result values after executing at vm
 	msg.VmResult = "vmResult"
 	msg.VmResponse = "vmResponse"
@@ -360,7 +379,7 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 	msg.Votes = +1
 	filter := bson.M{"message_hash": msg.MessageHash}
 	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse}
-	err, _ := DB.storage.Update("MessagesPool", filter, update, storageToken)
+	err, _ = DB.storage.Update("MessagesPool", filter, update, storageToken)
 	if err != nil {
 		Service.Logger.Error("process - ValidateExecuteTransactionMsg - update transactions in storage", zap.Error(err))
 		return err
@@ -411,41 +430,41 @@ func (s *InternalService) getConsensusMsgForTheRound(round int, storageToken str
 }
 
 // broadcast messages to connected nodes
-func (s *InternalService) broadcastMsg(msg interface{}) error {
-	s.Logger.Sugar().Debugf("broadcasting message : %+v", msg) // DEBUG
-	for _, node := range s.ConnectedSaiP2pNodes {
-		data, err := json.Marshal(msg)
-		if err != nil {
-			s.Logger.Error("process - round != 0 - broadcastMsg - marshal msg", zap.Error(err))
-			return err
-		}
-
-		param := url.Values{}
-		param.Add("message", string(data))
-
-		postRequest, err := http.NewRequest("post", node.Address, strings.NewReader(param.Encode()))
-		if err != nil {
-			s.Logger.Error("process - round != 0 - broadcastConsensusMsg - create post request", zap.Error(err))
-			return err
-		}
-
-		postRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-
-		client := http.Client{
-			Timeout: 10 * time.Second,
-		}
-
-		resp, err := client.Do(postRequest)
-		if err != nil {
-			s.Logger.Error("process - round != 0 - broadcastMsg - send post request", zap.Error(err))
-			return err
-		}
-
-		if resp.StatusCode != 200 {
-			s.Logger.Sugar().Errorf("process - round != 0 - broadcastMsg - send post request wrong status code : %d", resp.StatusCode)
-			return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
-		}
+func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) error {
+	data, err := json.Marshal(msg)
+	if err != nil {
+		s.Logger.Error("process - round != 0 - broadcastMsg - marshal msg", zap.Error(err))
+		return err
 	}
+
+	param := url.Values{}
+	param.Add("message", string(data))
+
+	postRequest, err := http.NewRequest("post", saiP2Paddress, strings.NewReader(param.Encode()))
+	if err != nil {
+		s.Logger.Error("process - round != 0 - broadcastConsensusMsg - create post request", zap.Error(err))
+		return err
+	}
+
+	postRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	resp, err := client.Do(postRequest)
+	if err != nil {
+		s.Logger.Error("process - round != 0 - broadcastMsg - send post request", zap.Error(err))
+		return err
+	}
+
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		s.Logger.Sugar().Errorf("process - round != 0 - broadcastMsg - send post request wrong status code : %d", resp.StatusCode)
+		return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
+	}
+
 	s.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG
 	return nil
 }
@@ -471,6 +490,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 
 	newBlock.Votes = +1
 	newBlock.Block.SenderSignature = btcResp.Signature
+	newBlock.Signatures = append(newBlock.Signatures, btcResp.Signature)
 
 	data, err := json.Marshal(newBlock)
 	if err != nil {
@@ -526,50 +546,50 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 	return txMsgs, nil
 }
 
-func (s *InternalService) getBTCkeys(saiBTCaddress string) {
-	file, err := os.OpenFile("btc_keys.json", os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+func (s *InternalService) getBTCkeys(fileStr, saiBTCaddress string) (*models.BtcKeys, error) {
+	file, err := os.OpenFile(fileStr, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
 	if err != nil {
 		s.Logger.Fatal("processing - open key btc file", zap.Error(err))
+		return nil, err
 	}
 
-	data, err := ioutil.ReadFile("btc_keys.json")
+	data, err := ioutil.ReadFile(fileStr)
 	if err != nil {
 		s.Logger.Fatal("processing - read key btc file", zap.Error(err))
+		return nil, err
 	}
+	btcKeys := models.BtcKeys{}
 
-	s.Logger.Debug("file", zap.String("file", string(data))) //DEBUG
-
-	btcKeys := &models.BtcKeys{}
-
-	err = json.Unmarshal(data, btcKeys)
+	err = json.Unmarshal(data, &btcKeys)
 	if err != nil {
 		s.Logger.Error("get btc keys - error unmarshal from file", zap.Error(err))
 		btcKeys, body, err := utils.GetBtcKeys(saiBTCaddress)
 		if err != nil {
 			s.Logger.Fatal("processing - get btc keys", zap.Error(err))
+			return nil, err
 		}
 		_, err = file.Write(body)
 		if err != nil {
 			s.Logger.Fatal("processing - write btc keys to file", zap.Error(err))
+			return nil, err
 		}
 
-		s.BTCkeys = btcKeys
+		return btcKeys, nil
 	} else {
 		err = btcKeys.Validate()
 		if err != nil {
 			btcKeys, body, err := utils.GetBtcKeys(saiBTCaddress)
 			if err != nil {
 				s.Logger.Fatal("processing - get btc keys", zap.Error(err))
+				return nil, err
 			}
 			_, err = file.Write(body)
 			if err != nil {
 				s.Logger.Fatal("processing - write btc keys to file", zap.Error(err))
+				return nil, err
 			}
-
-			s.BTCkeys = btcKeys
-		} else {
-			s.BTCkeys = btcKeys
+			return btcKeys, nil
 		}
+		return &btcKeys, nil
 	}
-	return
 }

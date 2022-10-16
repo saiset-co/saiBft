@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -21,8 +22,8 @@ type HandlerElement struct {
 }
 
 type jsonRequestType struct {
-	Method string
-	Data   interface{}
+	Method string      `json:"method"`
+	Data   interface{} `json:"data"`
 }
 
 type j map[string]interface{}
@@ -137,9 +138,17 @@ func (s *Service) handleWSConnections(conn *websocket.Conn) {
 
 func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Request) {
 	var message jsonRequestType
-	decoder := json.NewDecoder(req.Body)
-	decoderErr := decoder.Decode(&message)
 
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		e := j{"Status": "NOK", "Error": err.Error()}
+		errBody, _ := json.Marshal(e)
+		log.Println(e)
+		resp.Write(errBody)
+		return
+	}
+
+	decoderErr := json.Unmarshal(body, &message)
 	if decoderErr != nil {
 		err := j{"Status": "NOK", "Error": decoderErr.Error()}
 		errBody, _ := json.Marshal(err)

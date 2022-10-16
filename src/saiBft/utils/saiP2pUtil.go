@@ -14,7 +14,7 @@ import (
 
 // send direct get block message to connected nodes
 func SendDirectGetBlockMsg(address string, blockNumber int) ([]*models.BlockConsensusMessage, error) {
-	getBlocksRequest := &models.GetBlocksRequest{
+	getBlocksRequest := &models.GetMissedBlocksRequest{
 		LastBlockNumber: blockNumber,
 	}
 

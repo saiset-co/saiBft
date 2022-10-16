@@ -2,11 +2,10 @@ package models
 
 // representation of connected saiP2p connected nodes
 type SaiP2pNode struct {
-	Address string                   `json:"address"`
-	Blocks  []*BlockConsensusMessage // for blocks comparison when missed blocks requested. Temporary value.
+	Address string `json:"address"`
 }
 
 // request to get missed blocks from connected nodes
-type GetBlocksRequest struct {
+type GetMissedBlocksRequest struct {
 	LastBlockNumber int `json:"number"`
 }

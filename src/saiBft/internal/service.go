@@ -17,6 +17,8 @@ func Init(svc *saiService.Service, logger *zap.Logger) {
 	Service.Logger = logger
 
 	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
+	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
+	Service.Handler[HandleMessage.Name] = HandleMessage
 }
 
 type InternalService struct {
@@ -27,6 +29,7 @@ type InternalService struct {
 	Mutex                *sync.RWMutex
 	ConnectedSaiP2pNodes map[string]*models.SaiP2pNode
 	BTCkeys              *models.BtcKeys
+	MsgQueue             chan interface{}
 }
 
 // global handler for registering handlers
@@ -35,4 +38,5 @@ var Service = &InternalService{
 	Mutex:                new(sync.RWMutex),
 	ConnectedSaiP2pNodes: make(map[string]*models.SaiP2pNode),
 	Logger:               &zap.Logger{},
+	MsgQueue:             make(chan interface{}),
 }
