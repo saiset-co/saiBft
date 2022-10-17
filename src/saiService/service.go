@@ -118,7 +118,8 @@ func (s *Service) Start() {
 
 func (s *Service) ExecuteCommand(path string, data string) error {
 	b := []byte(data)
-	result, err := s.handleCliCommand(b)
+
+	result, err := s.handleCliCommand(path, b)
 	if err != nil {
 		return err
 	}

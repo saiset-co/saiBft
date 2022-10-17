@@ -18,6 +18,7 @@ func main() {
 
 	svc.RegisterConfig("build/config.yml")
 	internal.Init(svc, logger)
+	svc.Logger = logger
 
 	internal.Service.GlobalService = svc
 

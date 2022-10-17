@@ -26,6 +26,10 @@ type jsonRequestType struct {
 	Data   interface{} `json:"data"`
 }
 
+type cliRequestType struct {
+	Data json.RawMessage `json:"data"`
+}
+
 type j map[string]interface{}
 
 func (s *Service) handleSocketConnections(conn net.Conn) {
@@ -70,9 +74,9 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 }
 
 // handle cli command
-func (s *Service) handleCliCommand(data []byte) ([]byte, error) {
+func (s *Service) handleCliCommand(path string, data []byte) ([]byte, error) {
 
-	var message jsonRequestType
+	var message cliRequestType
 	if len(data) == 0 {
 		return nil, fmt.Errorf("empty data provided")
 	}
@@ -82,12 +86,7 @@ func (s *Service) handleCliCommand(data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	if message.Method == "" {
-		return nil, fmt.Errorf("empty message method got")
-
-	}
-
-	result, err := s.processPath(message.Method, message.Data)
+	result, err := s.processPath(path, message.Data)
 	if err != nil {
 		return nil, err
 	}

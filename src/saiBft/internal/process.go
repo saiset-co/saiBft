@@ -37,8 +37,6 @@ func (s *InternalService) Processing() {
 		s.Logger.Fatal("processing - wrong type of saiP2P address value from config")
 	}
 
-	go s.listenFromSaiP2P(saiBtcAddress)
-
 	s.Logger.Sugar().Debugf("starting processing") //DEBUG
 
 	// for tests
@@ -71,24 +69,24 @@ func (s *InternalService) Processing() {
 	s.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
 
 	//insert transaction for test purposes
-	// testTxMsg := &models.TransactionMessage{
-	// 	Type:        models.TransactionMsgType,
-	// 	MessageHash: "d23r2fsd",
-	// 	Votes:       0,
-	// 	Tx: &models.Tx{
-	// 		Block:           1,
-	// 		VM:              "ffff",
-	// 		SenderAddress:   s.BTCkeys.Address,
-	// 		Message:         "fsdfdsf",
-	// 		SenderSignature: "dsg34",
-	// 	},
-	// }
+	testTxMsg := &models.TransactionMessage{
+		Type:        models.TransactionMsgType,
+		MessageHash: "d23r2fsd",
+		Votes:       0,
+		Tx: &models.Tx{
+			Block:           1,
+			VM:              "ffff",
+			SenderAddress:   s.BTCkeys.Address,
+			Message:         "fsdfdsf",
+			SenderSignature: "dsg34",
+		},
+	}
 
-	// err, _ := DB.storage.Put("MessagesPool", testTxMsg, storageToken)
-	// if err != nil {
-	// 	s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
-	// }
-	// s.Logger.Sugar().Debugf("test tx message saved") //DEBUG
+	err, _ := DB.storage.Put("MessagesPool", testTxMsg, storageToken)
+	if err != nil {
+		s.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
+	}
+	s.Logger.Sugar().Debugf("test tx message saved") //DEBUG
 
 	for {
 		round := 0

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"reflect"
 	"sort"
 
 	"github.com/iamthe1whoknocks/bft/models"
@@ -32,17 +31,21 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 	for {
 
 		data := <-s.MsgQueue
-		t := reflect.TypeOf(data)
-		s.Logger.Sugar().Debugf("type of incoming object : %+v", t) //DEBUG
 
-		m := data.(map[string]interface{})
-		// err := json.Unmarshal(data, &m)
-		// if err != nil {
-		// 	Service.Logger.Error("listenFromSaiP2P  - unmarshal incoming bytes", zap.Error(err))
-		// 	continue
-		// }
+		str, ok := data.(string)
+		if !ok {
+			Service.Logger.Error("listenFromSaiP2P  - wrong type of data input")
+			continue
+		}
 
-		s.Logger.Sugar().Debugf("type of incoming msg : %s", m["type"]) //DEBUG
+		Service.Logger.Debug("got message", zap.String("message", str))
+		b := []byte(str)
+		m := make(map[string]interface{})
+		err := json.Unmarshal(b, &m)
+		if err != nil {
+			Service.Logger.Error("listenFromSaiP2P  - unmarshal incoming bytes", zap.Error(err), zap.String("data", string(b)))
+			continue
+		}
 
 		switch m["type"] {
 		// send message to ConsensusPool collection

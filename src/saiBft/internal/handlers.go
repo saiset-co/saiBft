@@ -4,6 +4,7 @@ package internal
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
@@ -84,12 +85,16 @@ var HandleMessage = saiService.HandlerElement{
 	Name:        "message",
 	Description: "handle messages",
 	Function: func(data interface{}) (interface{}, error) {
+		Service.Logger.Debug("got message from cli", zap.String("data", data.(string)))
 		Service.MsgQueue <- data
+		time.Sleep(10 * time.Second) // for test purposes
 		return "ok", nil
 	},
 }
 
 func (s *InternalService) Init() {
+	go s.listenFromSaiP2P(s.GlobalService.Configuration["saiBTC_address"].(string))
+
 }
 
 func (s *InternalService) Process() {
