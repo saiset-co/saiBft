@@ -17,7 +17,8 @@ import (
 var ConnectSaiP2pNodeHandler = saiService.HandlerElement{
 	Name:        "connect",
 	Description: "connect saiP2p node",
-	Function: func(data interface{}) (interface{}, error) {
+	Function: func(data interface{}, mode string) (interface{}, error) {
+		Service.GlobalService.SetLogger(&mode)
 		address, ok := data.(string)
 		if !ok {
 			Service.Logger.Debug("handling connect method, wrong type")
@@ -39,11 +40,12 @@ var ConnectSaiP2pNodeHandler = saiService.HandlerElement{
 var GetMissedBlocks = saiService.HandlerElement{
 	Name:        "getBlocks",
 	Description: "get missed blocks",
-	Function: func(data interface{}) (interface{}, error) {
+	Function: func(data interface{}, mode string) (interface{}, error) {
+		Service.GlobalService.SetLogger(&mode)
 		blockNumber, ok := data.(float64)
 		if !ok {
 			err := fmt.Errorf("wrong type of incoming data,incoming data : %s", data)
-			Service.Logger.Error("handlers - GetMissedBlocks - type assertion to GetBlocksRequest", zap.Error(err))
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - type assertion to GetBlocksRequest", zap.Error(err))
 			return nil, fmt.Errorf("wrong type of incoming data")
 		}
 
@@ -54,26 +56,26 @@ var GetMissedBlocks = saiService.HandlerElement{
 		filterGte := bson.M{"block.number": bson.M{"$lte": blockNumber}}
 		err, response := DB.storage.Get(blockchainCollection, filterGte, bson.M{}, storageToken)
 		if err != nil {
-			Service.Logger.Error("handlers - GetMissedBlocks - get blocks from storage", zap.Error(err))
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - get blocks from storage", zap.Error(err))
 			return nil, fmt.Errorf("handlers - GetMissedBlocks - get blocks from storage : %w", err)
 		}
 
 		if len(response) == 2 {
 			err = fmt.Errorf("block with number = %f was not found", blockNumber)
-			Service.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
+			Service.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
 			return nil, err
 		}
 
 		result, err := utils.ExtractResult(response)
 		if err != nil {
-			Service.Logger.Error("handlers - GetMissedBlocks - get blocks from storage - extract result", zap.Error(err))
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - get blocks from storage - extract result", zap.Error(err))
 			return nil, fmt.Errorf("handlers - GetMissedBlocks - get blocks from storage - extract result: %w", err)
 		}
 		blocks := make([]*models.BlockConsensusMessage, 0)
 
 		err = json.Unmarshal(result, &blocks)
 		if err != nil {
-			Service.Logger.Error("handlers - GetMissedBlocks - get blocks from storage - unmarshal result", zap.Error(err))
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - get blocks from storage - unmarshal result", zap.Error(err))
 			return nil, fmt.Errorf("handlers - GetMissedBlocks - get blocks from storage - unmarshal result: %w", err)
 		}
 		return blocks, nil
@@ -82,10 +84,11 @@ var GetMissedBlocks = saiService.HandlerElement{
 
 // connect saiP2p node to our microservice
 var HandleMessage = saiService.HandlerElement{
-	Name:        "message",
+	Name:        "tx",
 	Description: "handle messages",
-	Function: func(data interface{}) (interface{}, error) {
-		Service.Logger.Debug("got message from cli", zap.String("data", data.(string)))
+	Function: func(data interface{}, mode string) (interface{}, error) {
+		Service.GlobalService.SetLogger(&mode)
+		Service.GlobalService.Logger.Debug("got message from cli", zap.String("data", data.(string)))
 		Service.MsgQueue <- data
 		time.Sleep(10 * time.Second) // for test purposes
 		return "ok", nil

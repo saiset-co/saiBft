@@ -1,6 +1,10 @@
 package models
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+
 	valid "github.com/asaskevich/govalidator"
 )
 
@@ -18,12 +22,12 @@ type P2pMsg struct {
 
 // Consensus message
 type ConsensusMessage struct {
-	Type          string   `json:"type" valid:",required"`
 	SenderAddress string   `json:"sender_address" valid:",required"`
-	Block         int      `json:"block" valid:",required"`
+	BlockNumber   int      `json:"block_number" valid:",required"`
 	Round         int      `json:"round" valid:",required"`
 	Messages      []string `json:"messages" valid:",required"`
 	Signature     string   `json:"signature" valid:",required"`
+	Hash          string   `json:"hash" valid:",required"`
 }
 
 // Validate consensus message
@@ -32,10 +36,25 @@ func (m *ConsensusMessage) Validate() error {
 	return err
 }
 
+// Hashing consensus message
+func (m *ConsensusMessage) GetHash() (string, error) {
+	b, err := json.Marshal(&ConsensusMessage{
+		SenderAddress: m.SenderAddress,
+		BlockNumber:   m.BlockNumber,
+		Round:         m.Round,
+		Messages:      m.Messages,
+		Signature:     m.Signature,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256(b)
+	return hex.EncodeToString(hash[:]), nil
+}
+
 // BlockConsensus message
 type BlockConsensusMessage struct {
-	ID         string   `json:"-"`
-	Type       string   `json:"type" valid:",required"`
 	BlockHash  string   `json:"block_hash" valid:",required"`
 	Votes      int      `json:"votes"` // additional field, which was not added by Valeriy
 	Block      *Block   `json:"block" valid:",required"`
@@ -44,10 +63,12 @@ type BlockConsensusMessage struct {
 }
 
 type Block struct {
-	Number            int    `json:"number" valid:",required"`
-	PreviousBlockHash string `json:"prev_block_hash" valid:",required"`
-	SenderAddress     string `json:"sender_address" valid:",required"`
-	SenderSignature   string `json:"sender_signature,omitempty" valid:",required"`
+	Number            int            `json:"number" valid:",required"`
+	PreviousBlockHash string         `json:"prev_block_hash" valid:",required"`
+	SenderAddress     string         `json:"sender_address" valid:",required"`
+	SenderSignature   string         `json:"sender_signature,omitempty" valid:",required"`
+	BlockHash         string         `json:"block_hash"`
+	Messages          map[string]*Tx `json:"messages"`
 }
 
 // Validate block consensus message
@@ -56,30 +77,60 @@ func (m *BlockConsensusMessage) Validate() error {
 	return err
 }
 
+// Hashing block  message
+func (m *Block) GetHash() (string, error) {
+	b, err := json.Marshal(&Block{
+		Number:            m.Number,
+		PreviousBlockHash: m.PreviousBlockHash,
+		Messages:          m.Messages,
+		SenderAddress:     m.SenderAddress,
+		SenderSignature:   m.SenderSignature,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256(b)
+	return hex.EncodeToString(hash[:]), nil
+}
+
 // Transaction message
 type TransactionMessage struct {
-	Type        string      `json:"type" valid:",required"`
 	MessageHash string      `json:"message_hash" valid:",required"`
 	Tx          *Tx         `json:"message" valid:",required"`
 	Votes       int         `json:"votes"` // additional field, which was not added by Valeriy
 	VmProcessed bool        `json:"vm_processed"`
-	VmResult    string      `json:"vm_result"`
+	VmResult    bool        `json:"vm_result"`
 	VmResponse  interface{} `json:"vm_response"`
 }
 
 // transaction struct
 type Tx struct {
-	Block           int    `json:"block" valid:",required"`
-	VM              string `json:"vm" valid:",required"`
 	SenderAddress   string `json:"sender_address" valid:",required"`
 	Message         string `json:"message" valid:",required"`
 	SenderSignature string `json:"sender_signature" valid:",required"`
+	MessageHash     string `json:"message_hash"`
 }
 
 // Validate transaction message
 func (m *TransactionMessage) Validate() error {
 	_, err := valid.ValidateStruct(m)
 	return err
+}
+
+// Hashing block  message
+func (m *Tx) GetHash() (string, error) {
+	b, err := json.Marshal(&Tx{
+		SenderAddress:   m.SenderAddress,
+		Message:         m.Message,
+		SenderSignature: m.SenderSignature,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	hash := sha256.Sum256(b)
+	return hex.EncodeToString(hash[:]), nil
 }
 
 type GetBlockMsg struct {

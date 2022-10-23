@@ -10,11 +10,10 @@ import (
 
 // here we add all implemented handlers, create name of service and register config
 // moved from handlers to service because of initialization problems
-func Init(svc *saiService.Service, logger *zap.Logger) {
+func Init(svc *saiService.Service) {
 	MicroserviceConfiguration = NewConfiguration()
 	MicroserviceConfiguration.Set(svc.Configuration)
 	DB = NewDB()
-	Service.Logger = logger
 
 	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks

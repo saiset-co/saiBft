@@ -21,11 +21,15 @@ type Service struct {
 	Logger        *zap.Logger
 }
 
-var svc = new(Service)
-var eos = []byte("\n")
+var (
+	svc  = new(Service)
+	eos  = []byte("\n")
+	mode string
+)
 
 func NewService(name string) *Service {
 	svc.Name = name
+
 	return svc
 }
 
@@ -44,6 +48,7 @@ func (s *Service) RegisterConfig(path string) {
 }
 
 func (s *Service) RegisterHandlers(handlers Handler) {
+	svc.SetLogger(&mode)
 	s.Handlers = handlers
 }
 
@@ -88,10 +93,19 @@ func (s *Service) Start() {
 			{
 				Name:  "start",
 				Usage: "Start services",
-				Action: func(*cli.Context) error {
+				Action: func(c *cli.Context) error {
+					s.SetLogger(&mode)
 					s.StartServices()
 					return nil
 				},
+			},
+		},
+		Flags: []cli.Flag{
+			&cli.StringFlag{
+				Name:        "mode",
+				Aliases:     []string{"m"},
+				Usage:       "set mode (debug or not,if empty)",
+				Destination: &mode,
 			},
 		},
 	}
@@ -101,7 +115,8 @@ func (s *Service) Start() {
 		command.Name = method
 		command.Usage = handler.Description
 		command.Action = func(c *cli.Context) error {
-			err := s.ExecuteCommand(c.Command.Name, c.Args().Get(0)) // add args
+			s.SetLogger(&mode)
+			err := s.ExecuteCommand(c.Command.Name, c.Args().Get(0), mode) // add args
 			if err != nil {
 				return fmt.Errorf("error while executing command %s : %w", command.Name, err)
 			}
@@ -116,10 +131,10 @@ func (s *Service) Start() {
 	}
 }
 
-func (s *Service) ExecuteCommand(path string, data string) error {
+func (s *Service) ExecuteCommand(path string, data, mode string) error {
 	b := []byte(data)
 
-	result, err := s.handleCliCommand(path, b)
+	result, err := s.handleCliCommand(path, b, mode)
 	if err != nil {
 		return err
 	}
@@ -128,6 +143,7 @@ func (s *Service) ExecuteCommand(path string, data string) error {
 }
 
 func (s *Service) StartServices() {
+
 	useHttp := s.GetConfig("common.http.enabled", true).(bool)
 	useWS := s.GetConfig("common.ws.enabled", true).(bool)
 
@@ -139,15 +155,37 @@ func (s *Service) StartServices() {
 		go s.StartWS()
 	}
 
-	s.StartTasks()
+	s.StartTasks(mode)
 
 	log.Printf("%s has been started!", s.Name)
 
 	s.StartSocket()
 }
 
-func (s *Service) StartTasks() {
+func (s *Service) StartTasks(mode string) {
 	for _, task := range s.Tasks {
 		go task()
 	}
+}
+
+func (s *Service) SetLogger(mode *string) {
+	var (
+		logger *zap.Logger
+		err    error
+	)
+	if *mode == "debug" {
+		logger, err = zap.NewDevelopment(zap.AddStacktrace(zap.DPanicLevel))
+		if err != nil {
+			log.Fatal("error creating logger : ", err.Error())
+		}
+		logger.Debug("Logger started", zap.String("mode", "debug"))
+	} else {
+		logger, err = zap.NewProduction(zap.AddStacktrace(zap.DPanicLevel))
+		if err != nil {
+			log.Fatal("error creating logger : ", err.Error())
+		}
+		logger.Info("Logger started", zap.String("mode", "production"))
+	}
+
+	s.Logger = logger
 }

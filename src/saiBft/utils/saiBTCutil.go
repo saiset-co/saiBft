@@ -67,6 +67,7 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 		b, err = json.Marshal(&models.Block{
 			Number:            BCMsg.Block.Number,
 			PreviousBlockHash: BCMsg.Block.PreviousBlockHash,
+			Messages:          BCMsg.Block.Messages,
 			SenderAddress:     BCMsg.Block.SenderAddress,
 		})
 		if err != nil {
@@ -75,9 +76,8 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 	case *models.ConsensusMessage:
 		cMsg := msg.(*models.ConsensusMessage)
 		b, err = json.Marshal(&models.ConsensusMessage{
-			Type:          cMsg.Type,
 			SenderAddress: cMsg.SenderAddress,
-			Block:         cMsg.Block,
+			BlockNumber:   cMsg.BlockNumber,
 			Round:         cMsg.Round,
 			Messages:      cMsg.Messages,
 		})
@@ -87,8 +87,6 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 	case *models.TransactionMessage:
 		txMsg := msg.(*models.TransactionMessage)
 		b, err = json.Marshal(&models.Tx{
-			Block:         txMsg.Tx.Block,
-			VM:            txMsg.Tx.VM,
 			SenderAddress: txMsg.Tx.SenderAddress,
 			Message:       txMsg.Tx.Message,
 		})
@@ -124,21 +122,34 @@ func SignMessage(msg interface{}, address, privateKey string) (resp *models.Sign
 	switch msg.(type) {
 	case *models.BlockConsensusMessage:
 		BCMsg := msg.(*models.BlockConsensusMessage)
-		data, err := json.Marshal(BCMsg.Block)
+		data, err := json.Marshal(&models.Block{
+			Number:            BCMsg.Block.Number,
+			PreviousBlockHash: BCMsg.Block.PreviousBlockHash,
+			Messages:          BCMsg.Block.Messages,
+			SenderAddress:     BCMsg.Block.SenderAddress,
+		})
 		if err != nil {
 			return nil, err
 		}
 		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
 	case *models.ConsensusMessage:
 		cMsg := msg.(*models.ConsensusMessage)
-		data, err := json.Marshal(cMsg)
+		data, err := json.Marshal(&models.ConsensusMessage{
+			SenderAddress: cMsg.SenderAddress,
+			BlockNumber:   cMsg.BlockNumber,
+			Round:         cMsg.Round,
+			Messages:      cMsg.Messages,
+		})
 		if err != nil {
 			return nil, err
 		}
 		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
 	case *models.TransactionMessage:
 		TxMsg := msg.(*models.TransactionMessage)
-		data, err := json.Marshal(TxMsg.Tx)
+		data, err := json.Marshal(&models.Tx{
+			SenderAddress: TxMsg.Tx.SenderAddress,
+			Message:       TxMsg.Tx.Message,
+		})
 		if err != nil {
 			return nil, err
 		}

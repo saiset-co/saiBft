@@ -18,7 +18,7 @@ type Handler map[string]HandlerElement
 type HandlerElement struct {
 	Name        string // name to execute, can be path
 	Description string
-	Function    func(interface{}) (interface{}, error)
+	Function    func(interface{}, string) (interface{}, error)
 }
 
 type jsonRequestType struct {
@@ -27,7 +27,7 @@ type jsonRequestType struct {
 }
 
 type cliRequestType struct {
-	Data json.RawMessage `json:"data"`
+	Data string `json:"data"`
 }
 
 type j map[string]interface{}
@@ -48,7 +48,7 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 				continue
 			}
 
-			result, resultErr := s.processPath(message.Method, message.Data)
+			result, resultErr := s.processPath(message.Method, message.Data, mode)
 
 			if resultErr != nil {
 				err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -74,7 +74,7 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 }
 
 // handle cli command
-func (s *Service) handleCliCommand(path string, data []byte) ([]byte, error) {
+func (s *Service) handleCliCommand(path string, data []byte, mode string) ([]byte, error) {
 
 	var message cliRequestType
 	if len(data) == 0 {
@@ -86,7 +86,7 @@ func (s *Service) handleCliCommand(path string, data []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	result, err := s.processPath(path, message.Data)
+	result, err := s.processPath(path, message.Data, mode)
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +116,7 @@ func (s *Service) handleWSConnections(conn *websocket.Conn) {
 			continue
 		}
 
-		result, resultErr := s.processPath(message.Method, message.Data)
+		result, resultErr := s.processPath(message.Method, message.Data, mode)
 
 		if resultErr != nil {
 			err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -164,7 +164,7 @@ func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, resultErr := s.processPath(message.Method, message.Data)
+	result, resultErr := s.processPath(message.Method, message.Data, mode)
 
 	if resultErr != nil {
 		err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -187,7 +187,7 @@ func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Requ
 	resp.Write(body)
 }
 
-func (s *Service) processPath(path string, data interface{}) (interface{}, error) {
+func (s *Service) processPath(path string, data interface{}, mode string) (interface{}, error) {
 	h, ok := s.Handlers[path]
 
 	if !ok {
@@ -196,7 +196,7 @@ func (s *Service) processPath(path string, data interface{}) (interface{}, error
 
 	//todo: Rutina na process
 
-	response, err := h.Function(data)
+	response, err := h.Function(data, mode)
 	if err != nil {
 		return nil, err
 	}
