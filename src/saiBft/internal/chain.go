@@ -28,40 +28,58 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 		s.GlobalService.Logger.Fatal("wrong type of saiBTC_address value in config")
 	}
 
+	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
+	if !ok {
+		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
+	}
+	btckeys, err := s.getBTCkeys("btc_keys.json", saiBtcAddress)
+	if err != nil {
+		Service.GlobalService.Logger.Fatal("listenFromSaiP2P  - handle tx msg - get btc keys", zap.Error(err))
+	}
+	s.BTCkeys = btckeys
+
 	for {
-
 		data := <-s.MsgQueue
+		switch data.(type) {
+		case *models.Tx:
+			txMsg := data.(*models.Tx)
+			Service.GlobalService.Logger.Sugar().Debugf("got tx message : %+v", txMsg)
 
-		str, ok := data.(string)
-		if !ok {
-			Service.GlobalService.Logger.Error("listenFromSaiP2P  - wrong type of data input")
-			continue
-		}
+			//todo : tx msg in bytes or struct, not string
 
-		Service.GlobalService.Logger.Debug("got message", zap.String("message", str))
-		b := []byte(str)
-		m := make(map[string]interface{})
-		err := json.Unmarshal(b, &m)
-		if err != nil {
-			Service.GlobalService.Logger.Error("listenFromSaiP2P  - unmarshal incoming bytes", zap.Error(err), zap.String("data", string(b)))
-			continue
-		}
+			msg := &models.TransactionMessage{
+				Tx:          txMsg,
+				MessageHash: txMsg.MessageHash,
+			}
 
-		switch m["type"] {
-		// send message to ConsensusPool collection
-		case models.ConsensusMsgType:
-			jsonData, err := json.Marshal(m)
+			err = msg.Validate()
 			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - marshal", zap.Error(err))
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - validate", zap.Error(err))
 				continue
 			}
-			msg := models.ConsensusMessage{}
 
-			err = json.Unmarshal(jsonData, &msg)
+			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
 			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - unmarshal", zap.Error(err))
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
 			}
+
+			err = s.broadcastMsg(msg.Tx, saiP2Paddress)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
+				continue
+			}
+
+			err, _ = DB.storage.Put("MessagesPool", msg, storageToken)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
+				continue
+			}
+			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
+			s.MsgQueue <- struct{}{}
+
+		case *models.ConsensusMessage:
+			msg := data.(*models.ConsensusMessage)
 			err = msg.Validate()
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate", zap.Error(err))
@@ -81,73 +99,8 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			Service.GlobalService.Logger.Sugar().Debugf("ConsensusMsg was saved in ConsensusPool storage, msg : %+v\n", msg)
 			continue
 
-		// send message to MessagesPool collection
-		case models.TransactionMsgType:
-			jsonData, err := json.Marshal(m)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - marshal", zap.Error(err))
-				continue
-			}
-			msg := models.TransactionMessage{}
+		case *models.Block:
 
-			err = json.Unmarshal(jsonData, &msg)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - unmarshal", zap.Error(err))
-				continue
-			}
-			err = msg.Validate()
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - validate", zap.Error(err))
-				continue
-			}
-
-			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
-				continue
-			}
-
-			err, _ = DB.storage.Put("MessagesPool", msg, storageToken)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
-				continue
-			}
-			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
-			continue
-
-		// handle BlockConsensusMsg
-		case models.BlockConsensusMsgType:
-			jsonData, err := json.Marshal(m)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - blockConsensusMsg - marshal", zap.Error(err))
-				continue
-			}
-			msg := models.BlockConsensusMessage{}
-
-			err = json.Unmarshal(jsonData, &msg)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - blockConsensusMsg - unmarshal", zap.Error(err))
-				continue
-			}
-			err = msg.Validate()
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - blockConsensusMsg - validate", zap.Error(err))
-				continue
-			}
-
-			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.Block.SenderAddress, msg.Block.SenderSignature)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - blockConsensusMsg - validate signature ", zap.Error(err))
-				continue
-			}
-
-			err = s.handleBlockConsensusMsg(saiBTCaddress, storageToken, &msg)
-			if err != nil {
-				continue
-			}
-		default:
-			Service.GlobalService.Logger.Error("listenFromSaiP2P - blockConsensusMsg - wrong message type to handle")
-			continue
 		}
 	}
 }

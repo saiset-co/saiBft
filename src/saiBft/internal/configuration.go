@@ -2,7 +2,6 @@
 package internal
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/iamthe1whoknocks/saiService"
@@ -40,13 +39,13 @@ func (c *Configuration) Set(configuration map[string]interface{}) {
 	c.Mutex.Unlock()
 }
 
-// Get value from microservice local configuration
-func (c *Configuration) getValue(key string) interface{} {
-	c.Mutex.RLock()
-	val, ok := c.Cfg[key]
-	if !ok {
-		return fmt.Errorf("key %s was not found", key)
-	}
-	c.Mutex.RUnlock()
-	return val
-}
+// // Get value from microservice local configuration
+// func (c *Configuration) getValue(key string) interface{} {
+// 	c.Mutex.RLock()
+// 	val, ok := c.Cfg[key]
+// 	if !ok {
+// 		return fmt.Errorf("key %s was not found", key)
+// 	}
+// 	c.Mutex.RUnlock()
+// 	return val
+// }

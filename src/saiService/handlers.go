@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
@@ -74,19 +73,8 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 }
 
 // handle cli command
-func (s *Service) handleCliCommand(path string, data []byte, mode string) ([]byte, error) {
-
-	var message cliRequestType
-	if len(data) == 0 {
-		return nil, fmt.Errorf("empty data provided")
-	}
-
-	err := json.Unmarshal(data, &message)
-	if err != nil {
-		return nil, err
-	}
-
-	result, err := s.processPath(path, message.Data, mode)
+func (s *Service) handleCliCommand(path string, data []string, mode string) ([]byte, error) {
+	result, err := s.processPath(path, data, mode)
 	if err != nil {
 		return nil, err
 	}

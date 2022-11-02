@@ -58,7 +58,7 @@ type BlockConsensusMessage struct {
 	BlockHash  string   `json:"block_hash" valid:",required"`
 	Votes      int      `json:"votes"` // additional field, which was not added by Valeriy
 	Block      *Block   `json:"block" valid:",required"`
-	Count      int      `json:"-"` // extended value for consensu while get missed blocks from p2p services
+	Count      int      `json:"-"` // extended value for consensus while get missed blocks from p2p services
 	Signatures []string `json:"voted_signatures"`
 }
 
@@ -109,7 +109,13 @@ type Tx struct {
 	SenderAddress   string `json:"sender_address" valid:",required"`
 	Message         string `json:"message" valid:",required"`
 	SenderSignature string `json:"sender_signature" valid:",required"`
-	MessageHash     string `json:"message_hash"`
+	MessageHash     string `json:"message_hash" valid:",required"`
+}
+
+// tx message struct
+type TxMessage struct {
+	Method string   `json:"method" valid:",required"`
+	Params []string `json:"params" valid:",required"`
 }
 
 // Validate transaction message

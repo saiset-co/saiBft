@@ -17,6 +17,7 @@ func Init(svc *saiService.Service) {
 
 	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
+	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
 	Service.Handler[HandleMessage.Name] = HandleMessage
 }
 

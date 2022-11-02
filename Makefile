@@ -9,25 +9,36 @@ build:
 	make docker
 
 service:
-	## bft
-	cd ./src/saiBft && go build -o ../../microservices/saiBft/build/sai-bft
-	cp ./src/saiBft/build/config.yml ./microservices/saiBft/build/config.yml
-	## saiStorage
-	cd ./src/saiStorage && go build -o ../../microservices/saiStorage/build/sai-storage
-	cp ./src/saiStorage/config/config.json ./microservices/saiStorage/build/config.json
+	cd ./src/saiStorage && go mod tidy && go build -o ../../microservices/saiStorage/build/sai-storage
+	cd ./src/saiBft && go mod tidy && go build -o ../../microservices/saiBft/build/sai-bft
+	cd ./src/saiBTC && go mod tidy && go build -o ../../microservices/saiBtc/build/sai-btc	
+	cd ./src/saiP2p && go mod tidy && go build -o ../../microservices/saiP2p/build/sai-p2p	
+	cp ./src/saiBft/build/config.yml ./microservices/saiBft/build/build/config.yml
+	cp ./src/saiBTC/saibtc.config ./microservices/saiBtc/build/saibtc.config
+	cp ./src/saiStorage/config.json ./microservices/saiStorage/build/config.json
 	
+
 
 docker:
 	docker-compose -f ./microservices/docker-compose.yml up -d --build
 
-logs:
+log:
 	docker-compose -f ./microservices/docker-compose.yml logs -f
 
-logn:
-	docker-compose -f ./microservices/docker-compose.yml logs -f sai-consensus
+loga:
+	docker-compose -f ./microservices/docker-compose.yml logs -f sai-auth
 
-sh:
-	docker-compose -f ./microservices/docker-compose.yml exec sai-consensus sh
+logs:
+	docker-compose -f ./microservices/docker-compose.yml logs -f sai-storage
 
-run:
-	docker-compose -f ./microservices/docker-compose.yml run --rm sai-consensus
+logc:
+	docker-compose -f ./microservices/docker-compose.yml logs -f sai-contract-explorer
+
+sha:
+	docker-compose -f ./microservices/docker-compose.yml run --rm sai-auth sh
+
+shs:
+	docker-compose -f ./microservices/docker-compose.yml run --rm sai-storage sh
+
+shc:
+	docker-compose -f ./microservices/docker-compose.yml run --rm sai-contract-explorer sh

@@ -13,7 +13,7 @@
         "Pass": "",
         "Host": "127.0.0.1",
         "Port": "27017",
-        "Database": "sai"
+        "Database": "bft"
     },
     "Token": "12345",
     "Operations": ["registerAddress"],

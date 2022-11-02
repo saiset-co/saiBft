@@ -232,9 +232,7 @@ func (s *InternalService) Processing() {
 		txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 		if err != nil {
 			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-
 			round++
-
 			if round <= maxRoundNumber {
 				goto checkRound
 			} else {
@@ -242,7 +240,6 @@ func (s *InternalService) Processing() {
 				if err != nil {
 					continue
 				}
-
 				s.GlobalService.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
 				time.Sleep(time.Second)                                                             //DEBUG
 
@@ -254,6 +251,7 @@ func (s *InternalService) Processing() {
 				goto startLoop
 			}
 		}
+
 		newConsensusMsg := &models.ConsensusMessage{
 			SenderAddress: Service.BTCkeys.Address,
 			BlockNumber:   block.Block.Number,
@@ -647,8 +645,8 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, senderAddress string) {
 	testConsensusMsg := &models.ConsensusMessage{
 		SenderAddress: senderAddress,
-		BlockNumber:   1,
-		Round:         3,
+		BlockNumber:   3,
+		Round:         7,
 		Messages:      []string{"0060ee497708e7d9a8428802a6651b93847dca9a0217d05ad67a5a1be7d49223"},
 	}
 

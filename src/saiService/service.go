@@ -116,7 +116,7 @@ func (s *Service) Start() {
 		command.Usage = handler.Description
 		command.Action = func(c *cli.Context) error {
 			s.SetLogger(&mode)
-			err := s.ExecuteCommand(c.Command.Name, c.Args().Get(0), mode) // add args
+			err := s.ExecuteCommand(c.Command.Name, c.Args().Slice(), mode) // add args
 			if err != nil {
 				return fmt.Errorf("error while executing command %s : %w", command.Name, err)
 			}
@@ -131,10 +131,8 @@ func (s *Service) Start() {
 	}
 }
 
-func (s *Service) ExecuteCommand(path string, data, mode string) error {
-	b := []byte(data)
-
-	result, err := s.handleCliCommand(path, b, mode)
+func (s *Service) ExecuteCommand(path string, data []string, mode string) error {
+	result, err := s.handleCliCommand(path, data, mode)
 	if err != nil {
 		return err
 	}
