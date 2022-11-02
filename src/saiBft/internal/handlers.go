@@ -82,7 +82,7 @@ var GetMissedBlocks = saiService.HandlerElement{
 		}
 
 		if len(response) == 2 {
-			err = fmt.Errorf("block with number = %f was not found", blockNumber)
+			err = fmt.Errorf("block with number = %d was not found", blockNumber)
 			Service.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
 			return nil, err
 		}
