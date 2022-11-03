@@ -6,7 +6,7 @@ COPY ./build /srv/
 RUN apt-get update && apt-get install wget -y
 
 RUN chmod +x ./sai-bft
-CMD ./sai-bft
+CMD ./sai-bft -m debug start
 
 EXPOSE 8017
 EXPOSE 8018

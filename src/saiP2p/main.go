@@ -15,7 +15,7 @@ func main() {
 
 	r.POST("send", handler)
 
-	r.Run("127.0.0.1:8071")
+	r.Run(":8071")
 }
 
 func handler(c *gin.Context) {

@@ -484,7 +484,7 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 
 // form and save new block
 func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsensusMessage, saiBTCaddress, storageToken string, txMsgs []*models.TransactionMessage) (*models.BlockConsensusMessage, error) {
-	// todo ; insert messages
+
 	newBlock := &models.BlockConsensusMessage{
 		Block: &models.Block{
 			Number:            previousBlock.Block.Number + 1,
