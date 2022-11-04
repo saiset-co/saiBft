@@ -19,8 +19,7 @@ import (
 var ConnectSaiP2pNodeHandler = saiService.HandlerElement{
 	Name:        "connect",
 	Description: "connect saiP2p node",
-	Function: func(data interface{}, mode string) (interface{}, error) {
-		Service.GlobalService.SetLogger(&mode)
+	Function: func(data interface{}) (interface{}, error) {
 		address, ok := data.([]string)
 		if !ok {
 			Service.GlobalService.Logger.Sugar().Debugf("handling connect method, wrong type, current type : %+v", reflect.TypeOf(data))
@@ -48,8 +47,7 @@ var ConnectSaiP2pNodeHandler = saiService.HandlerElement{
 var GetMissedBlocks = saiService.HandlerElement{
 	Name:        "getBlocks",
 	Description: "get missed blocks",
-	Function: func(data interface{}, mode string) (interface{}, error) {
-		Service.GlobalService.SetLogger(&mode)
+	Function: func(data interface{}) (interface{}, error) {
 		cliData, ok := data.([]string)
 		if !ok {
 			err := fmt.Errorf("wrong type of incoming data,incoming data : %s, type : %+v", data, reflect.TypeOf(data))
@@ -75,7 +73,7 @@ var GetMissedBlocks = saiService.HandlerElement{
 		}
 
 		filterGte := bson.M{"block.number": bson.M{"$lte": blockNumber}}
-		err, response := DB.storage.Get(blockchainCollection, filterGte, bson.M{}, storageToken)
+		err, response := Service.Storage.Get(blockchainCollection, filterGte, bson.M{}, storageToken)
 		if err != nil {
 			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - get blocks from storage", zap.Error(err))
 			return nil, fmt.Errorf("handlers - GetMissedBlocks - get blocks from storage : %w", err)
@@ -108,7 +106,7 @@ var GetMissedBlocks = saiService.HandlerElement{
 var HandleTxFromCli = saiService.HandlerElement{
 	Name:        "tx",
 	Description: "handle tx message",
-	Function: func(data interface{}, mode string) (interface{}, error) {
+	Function: func(data interface{}) (interface{}, error) {
 		args, ok := data.([]string)
 		if !ok {
 			return nil, errors.New("wrong type for args in cli tx method")
@@ -172,7 +170,7 @@ var HandleTxFromCli = saiService.HandlerElement{
 var HandleMessage = saiService.HandlerElement{
 	Name:        "message",
 	Description: "handle  message from saiP2p",
-	Function: func(data interface{}, mode string) (interface{}, error) {
+	Function: func(data interface{}) (interface{}, error) {
 		b, ok := data.([]byte)
 		if !ok {
 			return nil, errors.New("wrong type for args in handle message method")

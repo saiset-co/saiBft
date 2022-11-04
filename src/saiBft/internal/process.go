@@ -133,7 +133,12 @@ func (s *InternalService) Processing() {
 		time.Sleep(time.Second)                                    //DEBUG
 		if round == 0 {
 			// get messages with votes = 0
-			transactions, _ := s.getZeroVotedTransactions(storageToken)
+			transactions, err := s.getZeroVotedTransactions(storageToken)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round == 0 - get zero-voted tx messages", zap.Error(err))
+				round++
+				goto checkRound
+			}
 
 			s.GlobalService.Logger.Sugar().Debugf("Got transactions with votes = 0 : %+v", transactions) //DEBUG
 			time.Sleep(time.Second)                                                                      //DEBUG
@@ -312,7 +317,7 @@ func (s *InternalService) Processing() {
 // get last block from blockchain collection
 func (s *InternalService) getLastBlockFromBlockChain(storageToken string) ([]byte, error) {
 	opts := options.Find().SetSort(bson.M{"block.number": -1}).SetLimit(1)
-	err, result := DB.storage.Get(blockchainCollection, bson.M{}, opts, storageToken)
+	err, result := s.Storage.Get(blockchainCollection, bson.M{}, opts, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - processing - get last block", zap.Error(err))
 		return nil, err
@@ -351,7 +356,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 
 // get messages with votes = 0
 func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*models.TransactionMessage, error) {
-	err, result := DB.storage.Get("MessagesPool", bson.M{"votes": 0}, bson.M{}, storageToken)
+	err, result := s.Storage.Get("MessagesPool", bson.M{"votes": 0}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round = 0 - get messages with 0 votes", zap.Error(err))
 		return nil, err
@@ -394,7 +399,7 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 	msg.Votes = +1
 	filter := bson.M{"message_hash": msg.MessageHash}
 	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse}
-	err, _ = DB.storage.Update("MessagesPool", filter, update, storageToken)
+	err, _ = s.Storage.Update("MessagesPool", filter, update, storageToken)
 	if err != nil {
 		Service.GlobalService.Logger.Error("process - ValidateExecuteTransactionMsg - update transactions in storage", zap.Error(err))
 		return err
@@ -415,7 +420,7 @@ func checkConsensusMsgSender(validators []string, msg *models.ConsensusMessage) 
 
 // get consensus messages for the round
 func (s *InternalService) getConsensusMsgForTheRound(round int, storageToken string) ([]*models.ConsensusMessage, error) {
-	err, result := DB.storage.Get("ConsensusPool", bson.M{"round": round}, bson.M{}, storageToken)
+	err, result := s.Storage.Get("ConsensusPool", bson.M{"round": round}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round != 0 - get messages for specified round", zap.Error(err))
 		return nil, err
@@ -518,7 +523,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.BlockHash = blockHash
 	newBlock.Block.BlockHash = blockHash
 
-	err, _ = DB.storage.Put(blockchainCollection, newBlock, storageToken)
+	err, _ = s.Storage.Put(blockchainCollection, newBlock, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - put block to blockchain collection", zap.Error(err))
 		return nil, err
@@ -530,7 +535,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 func (s *InternalService) updateTxMsgVotes(hash, storageToken string) error {
 	criteria := bson.M{"message_hash": hash}
 	update := bson.M{"$inc": bson.M{"votes": 1}}
-	err, _ := DB.storage.Upsert("MessagesPool", criteria, update, storageToken)
+	err, _ := s.Storage.Upsert("MessagesPool", criteria, update, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - round != 0 - get messages for specified round", zap.Error(err))
 		return err
@@ -542,7 +547,7 @@ func (s *InternalService) updateTxMsgVotes(hash, storageToken string) error {
 func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string, round int) ([]*models.TransactionMessage, error) {
 	requiredVotes := float64(len(s.TrustedValidators)) / float64(round)
 	filterGte := bson.M{"votes": bson.M{"$gte": requiredVotes}}
-	err, result := DB.storage.Get("MessagesPool", filterGte, bson.M{}, storageToken)
+	err, result := s.Storage.Get("MessagesPool", filterGte, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - round != 0 - get tx messages with specified votes count", zap.Float64("votes count", requiredVotes), zap.Error(err))
 		return nil, err
@@ -635,7 +640,7 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 	testTxMsg.Tx.MessageHash = testTxHash
 	testTxMsg.MessageHash = testTxHash
 
-	err, _ = DB.storage.Put("MessagesPool", testTxMsg, storageToken)
+	err, _ = s.Storage.Put("MessagesPool", testTxMsg, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test tx msg", zap.Error(err))
 	}
@@ -663,7 +668,7 @@ func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, send
 
 	testConsensusMsg.Hash = testConsensusHash
 
-	err, _ = DB.storage.Put("ConsensusPool", testConsensusMsg, storageToken)
+	err, _ = s.Storage.Put("ConsensusPool", testConsensusMsg, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test consensus msg", zap.Error(err))
 	}

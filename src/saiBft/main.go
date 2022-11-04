@@ -8,10 +8,11 @@ import (
 func main() {
 	svc := saiService.NewService("bft")
 
-	svc.RegisterConfig("build/config.yml")
-	internal.Init(svc)
-
 	internal.Service.GlobalService = svc
+
+	svc.RegisterConfig("config.yml")
+
+	internal.Init(svc)
 
 	internal.Service.GlobalService.RegisterHandlers(internal.Service.Handler)
 

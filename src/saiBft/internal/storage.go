@@ -6,31 +6,19 @@ import (
 	"github.com/iamthe1whoknocks/bft/utils"
 )
 
-// example storage
-var DB *storageManager
-
-// Example of storage to deal with in handlers.
-// Must be global, if handler func will be like func() interface{}
-type storageManager struct {
-	storage utils.Database
-}
-
-func NewDB() *storageManager {
-	url, ok := MicroserviceConfiguration.Cfg["storage_url"].(string)
+func NewDB() utils.Database {
+	url, ok := Service.GlobalService.Configuration["storage_url"].(string)
 	if !ok {
-		log.Fatalf("configuration : invalid storage url provided, url : %s", MicroserviceConfiguration.Cfg["storage_url"])
+		log.Fatalf("configuration : invalid storage url provided, url : %s", Service.GlobalService.Configuration["storage_url"])
 	}
-	email, ok := MicroserviceConfiguration.Cfg["storage_email"].(string)
+	email, ok := Service.GlobalService.Configuration["storage_email"].(string)
 	if !ok {
-		log.Fatalf("configuration : invalid storage email provided, email : %s", MicroserviceConfiguration.Cfg["storage_email"])
+		log.Fatalf("configuration : invalid storage email provided, email : %s", Service.GlobalService.Configuration["storage_email"])
 	}
-	password, ok := MicroserviceConfiguration.Cfg["storage_password"].(string)
+	password, ok := Service.GlobalService.Configuration["storage_password"].(string)
 	if !ok {
-		log.Fatalf("configuration : invalid storage password provided, password : %s", MicroserviceConfiguration.Cfg["storage_email"])
+		log.Fatalf("configuration : invalid storage password provided, password : %s", Service.GlobalService.Configuration["storage_email"])
 	}
 
-	s := &storageManager{
-		storage: utils.Storage(url, email, password),
-	}
-	return s
+	return utils.Storage(url, email, password)
 }

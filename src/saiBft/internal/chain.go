@@ -70,7 +70,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				continue
 			}
 
-			err, _ = DB.storage.Put("MessagesPool", msg, storageToken)
+			err, _ = s.Storage.Put("MessagesPool", msg, storageToken)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
 				continue
@@ -91,7 +91,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
 			}
-			err, _ = DB.storage.Put("ConsensusPool", msg, storageToken)
+			err, _ = s.Storage.Put("ConsensusPool", msg, storageToken)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - put to storage", zap.Error(err))
 				continue
@@ -116,7 +116,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 	}
 
 	// todo : if there is no such block? -
-	err, result := DB.storage.Get(blockchainCollection, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
+	err, result := s.Storage.Get(blockchainCollection, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N ", zap.Error(err))
 		return err
@@ -150,7 +150,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 
 		filter := bson.M{"number": block.Block.Number}
 		update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
-		err, _ = DB.storage.Update(blockchainCollection, filter, update, storageToken)
+		err, _ = s.Storage.Update(blockchainCollection, filter, update, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update votes in storage", zap.Error(err))
 			return err
@@ -178,7 +178,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 				return err
 			}
 
-			err, _ = DB.storage.Put(blockchainCollection, resultBlocks, storageToken)
+			err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
 			if err != nil {
 				return err
 			}
@@ -251,14 +251,14 @@ func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMe
 // get block candidate with the block hash
 // add vote if exists, insert blockCandidate, if not exists
 func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, storageToken string) (*models.BlockConsensusMessage, error) {
-	err, result := DB.storage.Get("BlockCandidates", bson.M{"hash": msg.Block.BlockHash}, bson.M{}, storageToken)
+	err, result := s.Storage.Get("BlockCandidates", bson.M{"hash": msg.Block.BlockHash}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - get block candidate by msg block hash", zap.Error(err))
 		return nil, err
 	}
 	// empty get response returns '{}' in storage get method
 	if len(result) == 2 {
-		err, _ := DB.storage.Put("BlockCandidates", msg, storageToken)
+		err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
 			return nil, err

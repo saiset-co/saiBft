@@ -1,16 +1,17 @@
-  socket:
-    port: 8017
+  socket_host: "localhost"
+  socket_port: 8017
   http:
     enabled: true
     port: 8018
   ws:
     enabled: true
     port: 8019
-  test: "TEST"
-  sai_crypto_address: "127.0.0.1:8085"
-  storage_token: "ddddddd"
-  trusted_validators: ["address1",address2,"address3"]
-  sleep: 20
-  storage_url: "http://127.0.0.1:8084"
+  storage_token: "12345"
+  trusted_validators: []
+  sleep: 2
+  storage_url: "http://sai-storage:8801"
   storage_email: "ddd@mial.com"
   storage_password: "fdfsdf"
+  saiBTC_address: "http://sai-btc:3305"
+  saiP2P_address: "http://sai-p2p:8071/send"
+  log_mode: "debug"

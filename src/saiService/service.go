@@ -48,7 +48,6 @@ func (s *Service) RegisterConfig(path string) {
 }
 
 func (s *Service) RegisterHandlers(handlers Handler) {
-	svc.SetLogger(&mode)
 	s.Handlers = handlers
 }
 
@@ -94,7 +93,6 @@ func (s *Service) Start() {
 				Name:  "start",
 				Usage: "Start services",
 				Action: func(c *cli.Context) error {
-					s.SetLogger(&mode)
 					s.StartServices()
 					return nil
 				},
@@ -115,7 +113,6 @@ func (s *Service) Start() {
 		command.Name = method
 		command.Usage = handler.Description
 		command.Action = func(c *cli.Context) error {
-			s.SetLogger(&mode)
 			err := s.ExecuteCommand(c.Command.Name, c.Args().Slice(), mode) // add args
 			if err != nil {
 				return fmt.Errorf("error while executing command %s : %w", command.Name, err)
@@ -153,25 +150,27 @@ func (s *Service) StartServices() {
 		go s.StartWS()
 	}
 
-	s.StartTasks(mode)
+	s.StartTasks()
 
 	log.Printf("%s has been started!", s.Name)
 
 	s.StartSocket()
 }
 
-func (s *Service) StartTasks(mode string) {
+func (s *Service) StartTasks() {
 	for _, task := range s.Tasks {
 		go task()
 	}
 }
 
-func (s *Service) SetLogger(mode *string) {
+func (s *Service) SetLogger() {
 	var (
 		logger *zap.Logger
 		err    error
 	)
-	if *mode == "debug" {
+
+	mode := s.Configuration["log_mode"].(string)
+	if mode == "debug" {
 		logger, err = zap.NewDevelopment(zap.AddStacktrace(zap.DPanicLevel))
 		if err != nil {
 			log.Fatal("error creating logger : ", err.Error())

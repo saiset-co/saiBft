@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/iamthe1whoknocks/bft/models"
+	"github.com/iamthe1whoknocks/bft/utils"
 	"github.com/iamthe1whoknocks/saiService"
 	"go.uber.org/zap"
 )
@@ -11,9 +12,10 @@ import (
 // here we add all implemented handlers, create name of service and register config
 // moved from handlers to service because of initialization problems
 func Init(svc *saiService.Service) {
-	MicroserviceConfiguration = NewConfiguration()
-	MicroserviceConfiguration.Set(svc.Configuration)
-	DB = NewDB()
+	storage := NewDB()
+	Service.Storage = storage
+
+	Service.GlobalService.SetLogger()
 
 	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
@@ -30,6 +32,7 @@ type InternalService struct {
 	ConnectedSaiP2pNodes map[string]*models.SaiP2pNode
 	BTCkeys              *models.BtcKeys
 	MsgQueue             chan interface{}
+	Storage              utils.Database
 }
 
 // global handler for registering handlers

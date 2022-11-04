@@ -17,7 +17,7 @@ type Handler map[string]HandlerElement
 type HandlerElement struct {
 	Name        string // name to execute, can be path
 	Description string
-	Function    func(interface{}, string) (interface{}, error)
+	Function    func(interface{}) (interface{}, error)
 }
 
 type jsonRequestType struct {
@@ -184,7 +184,7 @@ func (s *Service) processPath(path string, data interface{}, mode string) (inter
 
 	//todo: Rutina na process
 
-	response, err := h.Function(data, mode)
+	response, err := h.Function(data)
 	if err != nil {
 		return nil, err
 	}
