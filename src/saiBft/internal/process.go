@@ -79,12 +79,9 @@ func (s *InternalService) Processing() {
 	for {
 		round := 0
 	startLoop:
-		time.Sleep(3 * time.Second) // for test purposes
-		s.GlobalService.Logger.Debug("start loop,round = 0")
-		time.Sleep(time.Second) //DEBUG
-
-		// for testing purposes
-		time.Sleep(2 * time.Second)
+		time.Sleep(3 * time.Second)                          // for test purposes
+		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
+		time.Sleep(2 * time.Second)                          //DEBUG
 
 		block := &models.BlockConsensusMessage{}
 
@@ -102,7 +99,6 @@ func (s *InternalService) Processing() {
 				s.GlobalService.Logger.Error("process - create initial block", zap.Error(err))
 				continue
 			}
-
 			s.GlobalService.Logger.Sugar().Debugf("First block created : %+v\n", block) //DEBUG
 			time.Sleep(time.Second)                                                     //DEBUG
 		} else {
@@ -593,7 +589,6 @@ func (s *InternalService) getBTCkeys(fileStr, saiBTCaddress string) (*models.Btc
 			s.GlobalService.Logger.Fatal("processing - write btc keys to file", zap.Error(err))
 			return nil, err
 		}
-
 		return btcKeys, nil
 	} else {
 		err = btcKeys.Validate()

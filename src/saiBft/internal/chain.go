@@ -38,7 +38,6 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			Service.GlobalService.Logger.Sugar().Debugf("chain - got tx message : %+v", txMsg) //DEBUG
 
 			//todo : tx msg in bytes or struct, not string
-
 			msg := &models.TransactionMessage{
 				Tx:          txMsg,
 				MessageHash: txMsg.MessageHash,
@@ -53,14 +52,16 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - tx msg - validate signature ", zap.Error(err))
 				continue
 			}
-			err = s.broadcastMsg(msg.Tx, saiP2Paddress)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
-				continue
-			}
+
 			err, _ = s.Storage.Put("MessagesPool", msg, storageToken)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
+				continue
+			}
+
+			err = s.broadcastMsg(msg.Tx, saiP2Paddress)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
 				continue
 			}
 			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
@@ -104,12 +105,12 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 // handle BlockConsensusMsg
 func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken string, msg *models.BlockConsensusMessage) error {
 	isValid := s.validateBlockConsensusMsg(msg)
-
 	if !isValid {
 		err := errors.New("Provided BlockConsensusMsg is invalid")
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - validate message and sender", zap.Error(err))
 		return err
 	}
+	// Get Block N
 	err, result := s.Storage.Get(blockchainCollection, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N ", zap.Error(err))
@@ -126,31 +127,21 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - getBlockCandidates", zap.Error(err))
 			return err
 		}
-
 		// this means, that blockCandidate didnt exist and was inserted
 		if blockCandidate == nil {
 			return nil
 		}
 
-		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate)
+		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate) //DEBUG
 
 		blockCandidate.Votes++
 		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
-
 		if blockCandidate.Votes < msg.Votes {
-			resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number)
+			err := s.updateBlockchain(msg, blockCandidate, storageToken)
 			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
+				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
 				return err
 			}
-
-			err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
-			if err != nil {
-				return err
-			}
-			s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
-			return nil
-
 		} else {
 			return nil
 		}
@@ -199,25 +190,17 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
 
 		if blockCandidate.Votes < block.Votes {
-			resultBlocks, err := s.sendDirectGetBlockMsg(block.Block.Number)
+			err := s.updateBlockchain(msg, blockCandidate, storageToken)
 			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
+				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
 				return err
 			}
-			err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
-			if err != nil {
-				return err
-			}
-			s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
-			return nil
-
-		} else {
-			return nil
 		}
-
+		return nil
 	}
 }
 
+// Get missed blocks from connected nodes & compare received blocks
 func (s *InternalService) sendDirectGetBlockMsg(lastBlockNumber int) (resultBlocks []*models.BlockConsensusMessage, err error) {
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
 	tempMap := make(map[*models.BlockConsensusMessage]int)
@@ -307,6 +290,7 @@ func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, s
 	return &blockCandidate, nil
 }
 
+// add vote to block N
 func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessage, storageToken string) error {
 	block.Signatures = append(block.Signatures, msg.Block.SenderSignature)
 	block.Votes++
@@ -314,4 +298,22 @@ func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessa
 	update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
 	err, _ := s.Storage.Update(blockchainCollection, filter, update, storageToken)
 	return err
+}
+
+// update blockchain
+// 1. get missed blocks from connected nodes
+// 2. put missed and chosen blocks to blockchain collection
+func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockConsensusMessage, storageToken string) error {
+	resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number)
+	if err != nil {
+		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
+		return err
+	}
+
+	err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
+	if err != nil {
+		return err
+	}
+	s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
+	return nil
 }
