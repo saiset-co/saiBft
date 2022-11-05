@@ -171,47 +171,52 @@ var HandleMessage = saiService.HandlerElement{
 	Name:        "message",
 	Description: "handle  message from saiP2p",
 	Function: func(data interface{}) (interface{}, error) {
-		b, ok := data.([]byte)
+		m, ok := data.(map[string]interface{})
 		if !ok {
-			return nil, errors.New("wrong type for args in handle message method")
+			return nil, fmt.Errorf("Wrong type of data  : %+v\n", reflect.TypeOf(data))
 		}
-		Service.GlobalService.Logger.Debug("got message from saiP2p", zap.String("data", string(b)))
+		Service.GlobalService.Logger.Sugar().Debugf("got message from saiP2p : %+v", m) // DEBUG
 
-		m := make(map[string]interface{})
-		err := json.Unmarshal(b, &m)
+		msgType, err := utils.DetectMsgTypeFromMap(m)
 		if err != nil {
-			Service.GlobalService.Logger.Error("handlers - handle message - unmarshal bytes", zap.Error(err))
-			return nil, fmt.Errorf("handlers - handle message - unmarshal bytes: %w", err)
+			return nil, err
+		}
+		switch msgType {
+		case models.BlockConsensusMsgType:
+			msg := models.BlockConsensusMessage{}
+			b, err := json.Marshal(m)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - unmarshal : %w", err)
+			}
+			err = json.Unmarshal(b, &msg)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - marshal bytes : %w", err)
+			}
+			Service.MsgQueue <- &msg
+		case models.ConsensusMsgType:
+			msg := models.ConsensusMessage{}
+			b, err := json.Marshal(m)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - unmarshal : %w", err)
+			}
+			err = json.Unmarshal(b, &msg)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - marshal bytes : %w", err)
+			}
+			Service.MsgQueue <- &msg
+		case models.TransactionMsgType:
+			msg := models.Tx{}
+			b, err := json.Marshal(m)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - unmarshal : %w", err)
+			}
+			err = json.Unmarshal(b, &msg)
+			if err != nil {
+				return nil, fmt.Errorf("handlers - handle message - marshal bytes : %w", err)
+			}
+			Service.MsgQueue <- &msg
 		}
 
-		if m["block_number"] != 0 && m["round"] != 0 { // detect message type, if true -> consensus message
-			msg := &models.ConsensusMessage{}
-			err := json.Unmarshal(b, msg)
-			if err != nil {
-				Service.GlobalService.Logger.Error("handlers - handle message - unmarshal bytes to consensus msg", zap.Error(err))
-				return nil, fmt.Errorf("handlers - handle message - unmarshal bytes to consensus msg: %w", err)
-			}
-			Service.MsgQueue <- msg
-
-		} else if m["number"] != 0 && m["prev_block_hash"] != nil { // detect message type, if true -> block message
-			msg := &models.Block{}
-			err := json.Unmarshal(b, msg)
-			if err != nil {
-				Service.GlobalService.Logger.Error("handlers - handle message - unmarshal bytes to block consensus msg", zap.Error(err))
-				return nil, fmt.Errorf("handlers - handle message - unmarshal bytes to block consensus msg: %w", err)
-			}
-			Service.MsgQueue <- msg
-		} else if m["message_hash"] != "" && m["message"] != "" { // detect message type, if true -> tx
-			msg := &models.Tx{}
-			err := json.Unmarshal(b, msg)
-			if err != nil {
-				Service.GlobalService.Logger.Error("handlers - handle message - unmarshal bytes to tx", zap.Error(err))
-				return nil, fmt.Errorf("handlers - handle message - unmarshal bytes to tx: %w", err)
-			}
-			Service.MsgQueue <- msg
-		} else {
-			return nil, errors.New("unknown type of message")
-		}
 		return "ok", nil
 	},
 }

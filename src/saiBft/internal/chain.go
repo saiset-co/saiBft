@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	"sort"
 
 	"github.com/iamthe1whoknocks/bft/models"
@@ -13,37 +14,28 @@ import (
 )
 
 // listening for messages from saiP2P
-
 func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
-
-	s.GlobalService.Logger.Debug("saiP2P listener started")
+	s.GlobalService.Logger.Debug("saiP2P listener started") // DEBUG
 
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("wrong type of storage_token value in config")
 	}
-
 	saiBtcAddress, ok := s.GlobalService.Configuration["saiBTC_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("wrong type of saiBTC_address value in config")
 	}
-
 	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
 	}
-	btckeys, err := s.getBTCkeys("btc_keys.json", saiBtcAddress)
-	if err != nil {
-		Service.GlobalService.Logger.Fatal("listenFromSaiP2P  - handle tx msg - get btc keys", zap.Error(err))
-	}
-	s.BTCkeys = btckeys
-
 	for {
 		data := <-s.MsgQueue
+		s.GlobalService.Logger.Debug("chain - got data", zap.Any("data", data)) // DEBUG
 		switch data.(type) {
 		case *models.Tx:
 			txMsg := data.(*models.Tx)
-			Service.GlobalService.Logger.Sugar().Debugf("got tx message : %+v", txMsg)
+			Service.GlobalService.Logger.Sugar().Debugf("chain - got tx message : %+v", txMsg) //DEBUG
 
 			//todo : tx msg in bytes or struct, not string
 
@@ -51,25 +43,21 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				Tx:          txMsg,
 				MessageHash: txMsg.MessageHash,
 			}
-
-			err = msg.Validate()
+			err := msg.Validate()
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - validate", zap.Error(err))
 				continue
 			}
-
 			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
 			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - tx msg - validate signature ", zap.Error(err))
 				continue
 			}
-
 			err = s.broadcastMsg(msg.Tx, saiP2Paddress)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
 				continue
 			}
-
 			err, _ = s.Storage.Put("MessagesPool", msg, storageToken)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
@@ -80,13 +68,13 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 
 		case *models.ConsensusMessage:
 			msg := data.(*models.ConsensusMessage)
-			err = msg.Validate()
+			Service.GlobalService.Logger.Sugar().Debugf("chain - got consensus message : %+v", msg) //DEBUG
+			err := msg.Validate()
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate", zap.Error(err))
 				continue
 			}
-
-			err = utils.ValidateSignature(&msg, saiBtcAddress, msg.SenderAddress, msg.Signature)
+			err = utils.ValidateSignature(msg, saiBtcAddress, msg.SenderAddress, msg.Signature)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
 				continue
@@ -99,8 +87,16 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			Service.GlobalService.Logger.Sugar().Debugf("ConsensusMsg was saved in ConsensusPool storage, msg : %+v\n", msg)
 			continue
 
-		case *models.Block:
-
+		case *models.BlockConsensusMessage:
+			msg := data.(*models.BlockConsensusMessage)
+			Service.GlobalService.Logger.Sugar().Debugf("chain - got block consensus message : %+v", msg) //DEBUG
+			err := s.handleBlockConsensusMsg(saiBtcAddress, storageToken, msg)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - block consensus msg - put to storage", zap.Error(err))
+				continue
+			}
+		default:
+			Service.GlobalService.Logger.Error("listenFromSaiP2P - got wrong msg type", zap.Any("type", reflect.TypeOf(data)))
 		}
 	}
 }
@@ -114,18 +110,50 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - validate message and sender", zap.Error(err))
 		return err
 	}
-
-	// todo : if there is no such block? -
 	err, result := s.Storage.Get(blockchainCollection, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N ", zap.Error(err))
 		return err
 	}
 
+	// if there is no such block - go futher (compare block hash)
 	if len(result) == 2 {
 		err = fmt.Errorf("block with number = %d was not found", msg.Block.Number)
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
-		return err
+		// get and process block candidate
+		blockCandidate, err := s.getBlockCandidate(msg, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - getBlockCandidates", zap.Error(err))
+			return err
+		}
+
+		// this means, that blockCandidate didnt exist and was inserted
+		if blockCandidate == nil {
+			return nil
+		}
+
+		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate)
+
+		blockCandidate.Votes++
+		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
+
+		if blockCandidate.Votes < msg.Votes {
+			resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number)
+			if err != nil {
+				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
+				return err
+			}
+
+			err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
+			if err != nil {
+				return err
+			}
+			s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
+			return nil
+
+		} else {
+			return nil
+		}
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("got block consensus : %s\n", result)
@@ -145,17 +173,11 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 	}
 
 	if block.BlockHash == msg.BlockHash {
-		block.Signatures = append(block.Signatures, msg.Block.SenderSignature)
-		block.Votes++
-
-		filter := bson.M{"number": block.Block.Number}
-		update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
-		err, _ = s.Storage.Update(blockchainCollection, filter, update, storageToken)
+		err := s.addVotesToBlock(&block, msg, storageToken)
 		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update votes in storage", zap.Error(err))
+			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - add votes to block", zap.Error(err))
 			return err
 		}
-
 		s.GlobalService.Logger.Sugar().Debugf("votes was updated in blockchain storage for block : %+v\n", block)
 		return nil
 	} else {
@@ -166,7 +188,12 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 			return err
 		}
 
-		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate)
+		// this means, that blockCandidate didnt exist and was inserted
+		if blockCandidate == nil {
+			return nil
+		}
+
+		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate) // DEBUG
 
 		blockCandidate.Votes++
 		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
@@ -177,7 +204,6 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
 				return err
 			}
-
 			err, _ = s.Storage.Put(blockchainCollection, resultBlocks, storageToken)
 			if err != nil {
 				return err
@@ -248,8 +274,8 @@ func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMe
 	return false
 }
 
-// get block candidate with the block hash
-// add vote if exists, insert blockCandidate, if not exists
+// get block candidate with the block hash, add vote if exists
+// insert blockCandidate, if not exists
 func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, storageToken string) (*models.BlockConsensusMessage, error) {
 	err, result := s.Storage.Get("BlockCandidates", bson.M{"hash": msg.Block.BlockHash}, bson.M{}, storageToken)
 	if err != nil {
@@ -263,8 +289,8 @@ func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, s
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
 			return nil, err
 		}
-		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection, blockCandidate : %+v\n", msg)
-		return msg, nil
+		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection, blockCandidate : %+v\n", msg) // DEBUG
+		return nil, nil
 	}
 	data, err := utils.ExtractResult(result)
 	if err != nil {
@@ -279,4 +305,13 @@ func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, s
 		return nil, err
 	}
 	return &blockCandidate, nil
+}
+
+func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessage, storageToken string) error {
+	block.Signatures = append(block.Signatures, msg.Block.SenderSignature)
+	block.Votes++
+	filter := bson.M{"number": block.Block.Number}
+	update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
+	err, _ := s.Storage.Update(blockchainCollection, filter, update, storageToken)
+	return err
 }

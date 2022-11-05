@@ -43,8 +43,6 @@ func (s *InternalService) Processing() {
 	// btcKeys3, _ := s.getBTCkeys("btc_keys1.json", saiBtcAddress)
 	s.TrustedValidators = append(s.TrustedValidators, btcKeys1.Address)
 
-	btckeys, _ := s.getBTCkeys("btc_keys.json", saiBtcAddress)
-	s.BTCkeys = btckeys
 	s.GlobalService.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
 	time.Sleep(time.Second)                                              //DEBUG
 
@@ -613,63 +611,5 @@ func (s *InternalService) getBTCkeys(fileStr, saiBTCaddress string) (*models.Btc
 			return btcKeys, nil
 		}
 		return &btcKeys, nil
-	}
-}
-
-// save test tx (for testing purposes)
-func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
-	testTxMsg := &models.TransactionMessage{
-		Votes: 0,
-		Tx: &models.Tx{
-			SenderAddress: s.BTCkeys.Address,
-			Message:       "test tx message",
-		},
-	}
-
-	resp, err := utils.SignMessage(testTxMsg, saiBtcAddress, s.BTCkeys.Private)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - sign test tx error", zap.Error(err))
-	}
-	testTxMsg.Tx.SenderSignature = resp.Signature
-
-	testTxHash, err := testTxMsg.Tx.GetHash()
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - hash test tx error", zap.Error(err))
-	}
-
-	testTxMsg.Tx.MessageHash = testTxHash
-	testTxMsg.MessageHash = testTxHash
-
-	err, _ = s.Storage.Put("MessagesPool", testTxMsg, storageToken)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - put test tx msg", zap.Error(err))
-	}
-}
-
-// save test consensusMsg (for testing purposes)
-func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, senderAddress string) {
-	testConsensusMsg := &models.ConsensusMessage{
-		SenderAddress: senderAddress,
-		BlockNumber:   3,
-		Round:         7,
-		Messages:      []string{"0060ee497708e7d9a8428802a6651b93847dca9a0217d05ad67a5a1be7d49223"},
-	}
-
-	resp, err := utils.SignMessage(testConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - sign test consensus error", zap.Error(err))
-	}
-	testConsensusMsg.Signature = resp.Signature
-
-	testConsensusHash, err := testConsensusMsg.GetHash()
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - hash test consensus error", zap.Error(err))
-	}
-
-	testConsensusMsg.Hash = testConsensusHash
-
-	err, _ = s.Storage.Put("ConsensusPool", testConsensusMsg, storageToken)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - put test consensus msg", zap.Error(err))
 	}
 }

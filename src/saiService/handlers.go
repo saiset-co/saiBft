@@ -47,7 +47,7 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 				continue
 			}
 
-			result, resultErr := s.processPath(message.Method, message.Data, mode)
+			result, resultErr := s.processPath(message.Method, message.Data)
 
 			if resultErr != nil {
 				err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -74,7 +74,7 @@ func (s *Service) handleSocketConnections(conn net.Conn) {
 
 // handle cli command
 func (s *Service) handleCliCommand(path string, data []string, mode string) ([]byte, error) {
-	result, err := s.processPath(path, data, mode)
+	result, err := s.processPath(path, data)
 	if err != nil {
 		return nil, err
 	}
@@ -104,7 +104,7 @@ func (s *Service) handleWSConnections(conn *websocket.Conn) {
 			continue
 		}
 
-		result, resultErr := s.processPath(message.Method, message.Data, mode)
+		result, resultErr := s.processPath(message.Method, message.Data)
 
 		if resultErr != nil {
 			err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -152,7 +152,7 @@ func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Requ
 		return
 	}
 
-	result, resultErr := s.processPath(message.Method, message.Data, mode)
+	result, resultErr := s.processPath(message.Method, message.Data)
 
 	if resultErr != nil {
 		err := j{"Status": "NOK", "Error": resultErr.Error()}
@@ -175,7 +175,7 @@ func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Requ
 	resp.Write(body)
 }
 
-func (s *Service) processPath(path string, data interface{}, mode string) (interface{}, error) {
+func (s *Service) processPath(path string, data interface{}) (interface{}, error) {
 	h, ok := s.Handlers[path]
 
 	if !ok {

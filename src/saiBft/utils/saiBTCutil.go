@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"reflect"
 	"strings"
 	"time"
 
@@ -94,7 +95,7 @@ func ValidateSignature(msg interface{}, address, SenderAddress, signature string
 			return fmt.Errorf("marshal TransactionMessage : %w", err)
 		}
 	default:
-		return errors.New("unknown type of message")
+		return fmt.Errorf("unknown type of message, incoming type : %+v\n", reflect.TypeOf(msg))
 	}
 	preparedString := fmt.Sprintf("method=validateSignature&a=%s&signature=%s&message=%s", SenderAddress, signature, string(b))
 	requestBody := strings.NewReader(preparedString)
@@ -149,6 +150,16 @@ func SignMessage(msg interface{}, address, privateKey string) (resp *models.Sign
 		data, err := json.Marshal(&models.Tx{
 			SenderAddress: TxMsg.Tx.SenderAddress,
 			Message:       TxMsg.Tx.Message,
+		})
+		if err != nil {
+			return nil, err
+		}
+		preparedString = fmt.Sprintf("method=signMessage&p=%s&message=%s", privateKey, string(data))
+	case *models.Tx:
+		TxMsg := msg.(*models.Tx)
+		data, err := json.Marshal(&models.Tx{
+			SenderAddress: TxMsg.SenderAddress,
+			Message:       TxMsg.Message,
 		})
 		if err != nil {
 			return nil, err

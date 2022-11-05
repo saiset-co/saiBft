@@ -6,7 +6,6 @@ import (
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
 	"github.com/iamthe1whoknocks/saiService"
-	"go.uber.org/zap"
 )
 
 // here we add all implemented handlers, create name of service and register config
@@ -17,6 +16,9 @@ func Init(svc *saiService.Service) {
 
 	Service.GlobalService.SetLogger()
 
+	btckeys, _ := Service.getBTCkeys("btc_keys.json", Service.GlobalService.Configuration["saiBTC_address"].(string))
+	Service.BTCkeys = btckeys
+
 	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
@@ -26,7 +28,6 @@ func Init(svc *saiService.Service) {
 type InternalService struct {
 	Handler              saiService.Handler  // handlers to define in this specified microservice
 	GlobalService        *saiService.Service // saiService reference
-	Logger               *zap.Logger
 	TrustedValidators    []string
 	Mutex                *sync.RWMutex
 	ConnectedSaiP2pNodes map[string]*models.SaiP2pNode
@@ -40,6 +41,5 @@ var Service = &InternalService{
 	Handler:              saiService.Handler{},
 	Mutex:                new(sync.RWMutex),
 	ConnectedSaiP2pNodes: make(map[string]*models.SaiP2pNode),
-	Logger:               &zap.Logger{},
 	MsgQueue:             make(chan interface{}),
 }

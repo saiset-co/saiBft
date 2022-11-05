@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	BlockConsensusMsgType = "BlockConsensus"
+	BlockConsensusMsgType = "blockConsensus"
 	ConsensusMsgType      = "сonsensus"
 	TransactionMsgType    = "message"
 )

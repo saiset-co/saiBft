@@ -98,14 +98,6 @@ func (s *Service) Start() {
 				},
 			},
 		},
-		Flags: []cli.Flag{
-			&cli.StringFlag{
-				Name:        "mode",
-				Aliases:     []string{"m"},
-				Usage:       "set mode (debug or not,if empty)",
-				Destination: &mode,
-			},
-		},
 	}
 
 	for method, handler := range s.Handlers {
