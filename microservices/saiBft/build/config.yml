@@ -2,7 +2,7 @@
   socket_port: 8017
   http:
     enabled: true
-    port: 8018
+    port: 8080
   ws:
     enabled: true
     port: 8019
