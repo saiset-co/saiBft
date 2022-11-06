@@ -1,6 +1,8 @@
 package internal
 
 import (
+	"time"
+
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
 	"go.uber.org/zap"
@@ -36,6 +38,8 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test tx msg", zap.Error(err))
 	}
+	s.GlobalService.Logger.Sugar().Debugf("test tx message saved") //DEBUG
+	time.Sleep(time.Second)                                        //DEBUG
 }
 
 // save test consensusMsg (for testing purposes)
@@ -64,4 +68,8 @@ func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, send
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test consensus msg", zap.Error(err))
 	}
+
+	s.GlobalService.Logger.Sugar().Debugf("test consensus message saved") //DEBUG
+	time.Sleep(time.Second)                                               //DEBUG
+
 }
