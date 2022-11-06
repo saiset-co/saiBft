@@ -35,7 +35,6 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 		case *models.Tx:
 			txMsg := data.(*models.Tx)
 			Service.GlobalService.Logger.Sugar().Debugf("chain - got tx message : %+v", txMsg) //DEBUG
-
 			//todo : tx msg in bytes or struct, not string
 			msg := &models.TransactionMessage{
 				Tx:          txMsg,
@@ -90,7 +89,18 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 		case *models.BlockConsensusMessage:
 			msg := data.(*models.BlockConsensusMessage)
 			Service.GlobalService.Logger.Sugar().Debugf("chain - got block consensus message : %+v", msg) //DEBUG
-			err := s.handleBlockConsensusMsg(saiBtcAddress, storageToken, msg)
+			err := msg.Validate()
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate", zap.Error(err))
+				continue
+			}
+			err = utils.ValidateSignature(msg, saiBtcAddress, msg.Block.SenderAddress, msg.Block.SenderSignature)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - validate signature ", zap.Error(err))
+				continue
+			}
+
+			err = s.handleBlockConsensusMsg(saiBtcAddress, storageToken, msg)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - block consensus msg - put to storage", zap.Error(err))
 				continue
