@@ -3,7 +3,6 @@ package internal
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
 	"reflect"
 	"sort"
 
@@ -119,32 +118,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 
 	// if there is no such block - go futher (compare block hash)
 	if len(result) == 2 {
-		err = fmt.Errorf("block with number = %d was not found", msg.Block.Number)
-		s.GlobalService.Logger.Error("handleBlockConsensusMsg - get block N", zap.Error(err))
-		// get and process block candidate
-		blockCandidate, err := s.getBlockCandidate(msg, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - getBlockCandidates", zap.Error(err))
-			return err
-		}
-		// this means, that blockCandidate didnt exist and was inserted
-		if blockCandidate == nil {
-			return nil
-		}
-
-		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate) //DEBUG
-
-		blockCandidate.Votes++
-		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
-		if blockCandidate.Votes < msg.Votes {
-			err := s.updateBlockchain(msg, blockCandidate, storageToken)
-			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
-				return err
-			}
-		} else {
-			return nil
-		}
+		return s.handleBlockCandidate(msg, storageToken)
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("got block consensus : %s\n", result)
@@ -156,7 +130,6 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 	}
 
 	block := models.BlockConsensusMessage{}
-
 	err = json.Unmarshal(data, &block)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - unmarshal block", zap.Error(err))
@@ -172,31 +145,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 		s.GlobalService.Logger.Sugar().Debugf("votes was updated in blockchain storage for block : %+v\n", block)
 		return nil
 	} else {
-		// get and process block candidate
-		blockCandidate, err := s.getBlockCandidate(msg, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - getBlockCandidates", zap.Error(err))
-			return err
-		}
-
-		// this means, that blockCandidate didnt exist and was inserted
-		if blockCandidate == nil {
-			return nil
-		}
-
-		s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate) // DEBUG
-
-		blockCandidate.Votes++
-		blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
-
-		if blockCandidate.Votes < block.Votes {
-			err := s.updateBlockchain(msg, blockCandidate, storageToken)
-			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
-				return err
-			}
-		}
-		return nil
+		return s.handleBlockCandidate(msg, storageToken)
 	}
 }
 
@@ -316,4 +265,33 @@ func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockCons
 	}
 	s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
 	return nil
+}
+
+// Block candidate logic
+// 1. Get block candidate from db
+//2. update blockchain if blockCandidate votes < incoming msg.Votes
+func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage, storageToken string) error {
+	blockCandidate, err := s.getBlockCandidate(msg, storageToken)
+	if err != nil {
+		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - getBlockCandidates", zap.Error(err))
+		return err
+	}
+	// this means, that blockCandidate didnt exist and was inserted
+	if blockCandidate == nil {
+		return nil
+	}
+
+	s.GlobalService.Logger.Sugar().Debugf("got block candidate : %+v\n", blockCandidate) //DEBUG
+
+	blockCandidate.Votes++
+	blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
+	if blockCandidate.Votes < msg.Votes {
+		err := s.updateBlockchain(msg, blockCandidate, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
+			return err
+		}
+	}
+	return nil
+
 }
