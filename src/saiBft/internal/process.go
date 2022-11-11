@@ -35,16 +35,14 @@ func (s *InternalService) Processing() {
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("starting processing") //DEBUG
-	time.Sleep(time.Second)                                      //DEBUG
 
 	// for tests
-	btcKeys1, _ := s.getBTCkeys("btc_keys3.json", saiBtcAddress)
+	//btcKeys1, _ := s.getBTCkeys("btc_keys3.json", saiBtcAddress)
 	// btcKeys2, _ := s.getBTCkeys("btc_keys2.json", saiBtcAddress)
 	// btcKeys3, _ := s.getBTCkeys("btc_keys1.json", saiBtcAddress)
-	s.TrustedValidators = append(s.TrustedValidators, btcKeys1.Address)
+	s.TrustedValidators = append(s.TrustedValidators, s.BTCkeys.Address)
 
 	s.GlobalService.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
-	time.Sleep(time.Second)                                              //DEBUG
 
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
@@ -64,17 +62,16 @@ func (s *InternalService) Processing() {
 	// }
 
 	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
-	time.Sleep(time.Second)                                                                   //DEBUG
 
 	//TEST transaction &consensus messages
 	s.saveTestTx(saiBtcAddress, storageToken)
-	s.saveTestConsensusMsg(saiBtcAddress, storageToken, s.TrustedValidators[0])
 
 	for {
-		round := 0
+
 	startLoop:
+		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
-		time.Sleep(4 * time.Second)                          //DEBUG
+		time.Sleep(1 * time.Second)                          //DEBUG
 
 		// get last block from blockchain collection or create initial block
 		block, err := s.getLastBlockFromBlockChain(storageToken, saiBtcAddress)
@@ -83,17 +80,13 @@ func (s *InternalService) Processing() {
 		}
 	checkRound:
 		// for testing purposes
-		time.Sleep(2 * time.Second)
 
 		s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
-		time.Sleep(time.Second)                                    //DEBUG
 		if round == 0 {
 			// get messages with votes = 0
 			transactions, err := s.getZeroVotedTransactions(storageToken)
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round == 0 - get zero-voted tx messages", zap.Error(err))
-				round++
-				goto checkRound
 			}
 			consensusMsg := &models.ConsensusMessage{
 				SenderAddress: s.BTCkeys.Address,
@@ -101,13 +94,17 @@ func (s *InternalService) Processing() {
 				Round:         round,
 			}
 			// validate/execute each tx msg, update hash and votes
-			for _, tx := range transactions {
-				err = s.validateExecuteTransactionMsg(tx, saiBtcAddress, storageToken)
-				if err != nil {
-					continue
+			if len(transactions) != 0 {
+				for _, tx := range transactions {
+					err = s.validateExecuteTransactionMsg(tx, saiBtcAddress, storageToken)
+					if err != nil {
+						continue
+					}
+					consensusMsg.Messages = append(consensusMsg.Messages, tx.MessageHash)
 				}
-				consensusMsg.Messages = append(consensusMsg.Messages, tx.MessageHash)
 			}
+
+			consensusMsg.Round = round + 1
 
 			btcResp, err := utils.SignMessage(consensusMsg, saiBtcAddress, s.BTCkeys.Private)
 			if err != nil {
@@ -120,6 +117,7 @@ func (s *InternalService) Processing() {
 				s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
 				goto startLoop
 			}
+
 			err = s.broadcastMsg(consensusMsg, saiP2Paddress)
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round==0 - broadcast consensus message", zap.Error(err))
@@ -136,7 +134,7 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
 				round++
-				if round <= maxRoundNumber {
+				if round < maxRoundNumber {
 					goto checkRound
 				} else {
 					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, nil)
@@ -147,7 +145,7 @@ func (s *InternalService) Processing() {
 					if err != nil {
 						continue
 					}
-					round = 0
+
 					goto startLoop
 				}
 			}
@@ -157,7 +155,7 @@ func (s *InternalService) Processing() {
 				// check if consensus message sender is from trusted validators list
 				err = checkConsensusMsgSender(s.TrustedValidators, msg)
 				if err != nil {
-					s.GlobalService.Logger.Error("handlers - process - round != 0 - check consensus message sender", zap.Error(err))
+					s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
 					continue
 				}
 				// update votes for each tx message from consensusMsg
@@ -168,77 +166,75 @@ func (s *InternalService) Processing() {
 					}
 				}
 			}
-		}
 
-		// get messages with votes>=(roundNumber*10)%
-		txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
-		if err != nil {
-			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-			round++
-			if round <= maxRoundNumber {
+			// get messages with votes>=(roundNumber*10)%
+			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
+			if err != nil {
+				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
+				round++
+				if round < maxRoundNumber {
+					goto checkRound
+				} else {
+					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
+					if err != nil {
+						continue
+					}
+					err = s.broadcastMsg(newBlock.Block, saiP2Paddress)
+					if err != nil {
+						continue
+					}
+					goto startLoop
+				}
+			}
+
+			newConsensusMsg := &models.ConsensusMessage{
+				SenderAddress: Service.BTCkeys.Address,
+				BlockNumber:   block.Block.Number,
+			}
+
+			for _, txMsg := range txMsgs {
+				newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
+			}
+			if round < maxRoundNumber {
+				newConsensusMsg.Round = round + 1
+				btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
+					goto startLoop
+				}
+
+				newConsensusMsg.Signature = btcResp.Signature
+
+				newConsensusMsgHash, err := newConsensusMsg.GetHash()
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
+					goto startLoop
+				}
+
+				newConsensusMsg.Hash = newConsensusMsgHash
+
+				err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
+				if err != nil {
+					continue
+				}
+
+				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
+
+				round++
 				goto checkRound
 			} else {
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 				if err != nil {
 					continue
 				}
-				err = s.broadcastMsg(newBlock.Block, saiP2Paddress)
+				err = s.broadcastMsg(newBlock, saiP2Paddress)
 				if err != nil {
 					continue
 				}
-				round = 0
+
 				goto startLoop
+
 			}
-		}
-
-		newConsensusMsg := &models.ConsensusMessage{
-			SenderAddress: Service.BTCkeys.Address,
-			BlockNumber:   block.Block.Number,
-			Round:         round,
-		}
-
-		for _, txMsg := range txMsgs {
-			newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
-		}
-
-		btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-		if err != nil {
-			s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
-			goto startLoop
-		}
-
-		newConsensusMsg.Signature = btcResp.Signature
-
-		newConsensusMsgHash, err := newConsensusMsg.GetHash()
-		if err != nil {
-			s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
-			goto startLoop
-		}
-
-		newConsensusMsg.Hash = newConsensusMsgHash
-
-		err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
-		if err != nil {
-			continue
-		}
-
-		time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-		round++
-
-		if round <= maxRoundNumber {
-			goto checkRound
-		} else {
-			newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
-			if err != nil {
-				continue
-			}
-			err = s.broadcastMsg(newBlock.Block, saiP2Paddress)
-			if err != nil {
-				continue
-			}
-			round = 0
-			goto startLoop
-
 		}
 	}
 }
@@ -274,6 +270,7 @@ func (s *InternalService) getLastBlockFromBlockChain(storageToken string, saiBtc
 			return nil, err
 		}
 		block := blocks[0]
+		block.Block.Number++
 		s.GlobalService.Logger.Sugar().Debugf("Got last block from blockchain collection : %+v\n", block) //DEBUG
 
 		return block, nil
@@ -287,7 +284,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 	block = &models.BlockConsensusMessage{
 		Votes: 0,
 		Block: &models.Block{
-			Number:            0,
+			Number:            1,
 			SenderAddress:     s.BTCkeys.Address,
 			PreviousBlockHash: "",
 			Messages:          make(map[string]*models.Tx),
@@ -308,7 +305,6 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 	block.Block.BlockHash = blockHash
 
 	s.GlobalService.Logger.Sugar().Debugf("First block created : %+v\n", block) //DEBUG
-	time.Sleep(time.Second)                                                     //DEBUG
 
 	return block, nil
 
@@ -343,7 +339,6 @@ func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*mode
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("Got transactions with votes = 0 : %+v", transactions) //DEBUG
-	time.Sleep(time.Second)                                                                      //DEBUG
 
 	return transactions, nil
 }
@@ -351,7 +346,6 @@ func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*mode
 // validate/execute each message, update message and hash and vote for valid messages
 func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionMessage, saiBTCaddress, storageToken string) error {
 	s.GlobalService.Logger.Sugar().Debugf("Handling transaction : %+v", msg) //DEBUG
-	time.Sleep(time.Second)                                                  //DEBUG
 
 	err := utils.ValidateSignature(msg, saiBTCaddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
 	if err != nil {
@@ -443,13 +437,12 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
-		s.GlobalService.Logger.Sugar().Errorf("process - round != 0 - broadcastMsg - send post request to host : %s wrong status code : %d", saiP2Paddress, resp.StatusCode)
-		return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
-	}
+	// if resp.StatusCode != 200 {
+	// 	s.GlobalService.Logger.Sugar().Errorf("process - round != 0 - broadcastMsg - send post request to host : %s wrong status code : %d", saiP2Paddress, resp.StatusCode)
+	// 	return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
+	// }
 
-	s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG
-	time.Sleep(time.Second)                                                             //DEBUG
+	s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG                                                       //DEBUG
 	return nil
 }
 
@@ -458,7 +451,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 
 	newBlock := &models.BlockConsensusMessage{
 		Block: &models.Block{
-			Number:            previousBlock.Block.Number + 1,
+			Number:            previousBlock.Block.Number,
 			PreviousBlockHash: previousBlock.BlockHash,
 			SenderAddress:     s.BTCkeys.Address,
 			Messages:          make(map[string]*models.Tx),
@@ -496,7 +489,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
-	time.Sleep(time.Second)                                                             //DEBUG
 
 	return newBlock, nil
 }

@@ -15,34 +15,6 @@ import (
 	"go.uber.org/zap"
 )
 
-// connect saiP2p node to our microservice
-var ConnectSaiP2pNodeHandler = saiService.HandlerElement{
-	Name:        "connect",
-	Description: "connect saiP2p node",
-	Function: func(data interface{}) (interface{}, error) {
-		address, ok := data.([]string)
-		if !ok {
-			Service.GlobalService.Logger.Sugar().Debugf("handling connect method, wrong type, current type : %+v", reflect.TypeOf(data))
-			return "not ok", nil
-		}
-
-		if len(address) == 0 {
-			err := errors.New("empty argument provided")
-			Service.GlobalService.Logger.Error("handlers - connect", zap.Error(err))
-			return nil, err
-		}
-		Service.GlobalService.Logger.Debug("got from connect handler", zap.String("value", string(address[0])))
-
-		Service.Mutex.Lock()
-		Service.ConnectedSaiP2pNodes[address[0]] = &models.SaiP2pNode{
-			Address: address[0],
-		}
-		Service.Mutex.Unlock()
-		Service.GlobalService.Logger.Sugar().Debugf("new saiP2p node was connected, connected nodes : %v", Service.ConnectedSaiP2pNodes)
-		return "ok", nil
-	},
-}
-
 // get missed blocks
 var GetMissedBlocks = saiService.HandlerElement{
 	Name:        "getBlocks",

@@ -139,12 +139,14 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, storageToken st
 		return err
 	}
 
-	block := models.BlockConsensusMessage{}
-	err = json.Unmarshal(data, &block)
+	blocks := []models.BlockConsensusMessage{}
+	err = json.Unmarshal(data, &blocks)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - unmarshal block", zap.Error(err))
 		return err
 	}
+
+	block := blocks[0]
 
 	if block.BlockHash == msg.BlockHash {
 		err := s.addVotesToBlock(&block, msg, storageToken)
@@ -253,8 +255,8 @@ func (s *InternalService) getBlockCandidate(msg *models.BlockConsensusMessage, s
 func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessage, storageToken string) error {
 	block.Signatures = append(block.Signatures, msg.Block.SenderSignature)
 	block.Votes++
-	filter := bson.M{"number": block.Block.Number}
-	update := bson.M{"votes": block.Votes, "voted_singatures": block.Signatures}
+	filter := bson.M{"block.number": block.Block.Number}
+	update := bson.M{"votes": block.Votes, "voted_signatures": block.Signatures}
 	err, _ := s.Storage.Update(blockchainCollection, filter, update, storageToken)
 	return err
 }

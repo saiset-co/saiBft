@@ -25,12 +25,17 @@ services:
       - "8018:8018"
       - "8019:8019"
 
+  sai-p2p_proxy:
+    build:
+      context: ./saiP2pProxy
+      dockerfile: Dockerfile
+    ports:
+      - "8071:8071"
+
   sai-p2p:
     build:
       context: ./saiP2p
       dockerfile: Dockerfile
     ports:
-      - "8071:8071"
-
-      
+      - "8112:8112"  
       

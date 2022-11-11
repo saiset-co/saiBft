@@ -25,7 +25,7 @@ type ConsensusMessage struct {
 	SenderAddress string   `json:"sender_address" valid:",required"`
 	BlockNumber   int      `json:"block_number" valid:",required"`
 	Round         int      `json:"round" valid:",required"`
-	Messages      []string `json:"messages" valid:",required"`
+	Messages      []string `json:"messages"`
 	Signature     string   `json:"signature" valid:",required"`
 	Hash          string   `json:"hash" valid:",required"`
 }

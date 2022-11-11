@@ -21,6 +21,7 @@ func main() {
 	internal.Service.GlobalService.RegisterTasks([]func(){
 		internal.Service.Process,
 	})
+
 	internal.Service.GlobalService.Start()
 
 }

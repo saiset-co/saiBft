@@ -1,0 +1,5 @@
+proxy_host: "localhost"
+proxy_port: "8071"
+proxy_endpoint: "send"
+bft_http_host: "localhost"
+bft_http_port: "8080"

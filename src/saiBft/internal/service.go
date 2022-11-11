@@ -14,12 +14,9 @@ func Init(svc *saiService.Service) {
 	storage := NewDB()
 	Service.Storage = storage
 
-	Service.GlobalService.SetLogger()
-
 	btckeys, _ := Service.getBTCkeys("btc_keys.json", Service.GlobalService.Configuration["saiBTC_address"].(string))
 	Service.BTCkeys = btckeys
 
-	Service.Handler[ConnectSaiP2pNodeHandler.Name] = ConnectSaiP2pNodeHandler
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
 	Service.Handler[HandleMessage.Name] = HandleMessage

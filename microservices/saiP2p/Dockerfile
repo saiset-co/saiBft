@@ -3,10 +3,9 @@ FROM ubuntu
 WORKDIR /srv
 
 COPY ./build /srv/
-RUN apt-get update && apt-get install wget -y
+RUN apt-get update && apt-get install wget curl -y
 
-RUN chmod +x ./sai-p2p
-CMD ./sai-p2p
+RUN chmod +x p2p_lin64
+CMD ./p2p_lin64
 
-EXPOSE 8071
-
+EXPOSE 8112

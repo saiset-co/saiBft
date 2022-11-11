@@ -45,6 +45,8 @@ func (s *Service) RegisterConfig(path string) {
 	if err != nil {
 		log.Fatalf("yamlErr: %v", err)
 	}
+
+	s.SetLogger()
 }
 
 func (s *Service) RegisterHandlers(handlers Handler) {
@@ -85,7 +87,9 @@ func (s *Service) GetConfig(path string, def interface{}) interface{} {
 }
 
 func (s *Service) Start() {
-	s.InitTask()
+	if s.InitTask != nil {
+		s.InitTask()
+	}
 
 	app := &cli.App{
 		Commands: []*cli.Command{
