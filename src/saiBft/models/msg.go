@@ -102,6 +102,7 @@ type TransactionMessage struct {
 	VmProcessed bool        `json:"vm_processed"`
 	VmResult    bool        `json:"vm_result"`
 	VmResponse  interface{} `json:"vm_response"`
+	BlockHash   string      `json:"block_hash"`
 }
 
 // transaction struct

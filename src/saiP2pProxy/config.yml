@@ -1,5 +1,5 @@
-proxy_host: "localhost"
+proxy_host: "sai-p2p-proxy"
 proxy_port: "8071"
 proxy_endpoint: "send"
-bft_http_host: "localhost"
-bft_http_port: "8080"
+bft_http_host: "sai-bft"
+bft_http_port: "8018"
