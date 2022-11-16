@@ -118,6 +118,12 @@ func (s *InternalService) Processing() {
 				goto startLoop
 			}
 
+			err, _ = s.Storage.Put("ConsensusPool", consensusMsg, storageToken)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
+				goto startLoop
+			}
+
 			err = s.broadcastMsg(consensusMsg, saiP2Paddress)
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round==0 - broadcast consensus message", zap.Error(err))
@@ -132,22 +138,7 @@ func (s *InternalService) Processing() {
 			// get consensus messages for the round
 			msgs, err := s.getConsensusMsgForTheRound(round, storageToken)
 			if err != nil {
-				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-				round++
-				if round < maxRoundNumber {
-					goto checkRound
-				} else {
-					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, nil)
-					if err != nil {
-						continue
-					}
-					err = s.broadcastMsg(newBlock.Block, saiP2Paddress)
-					if err != nil {
-						continue
-					}
-
-					goto startLoop
-				}
+				goto startLoop
 			}
 
 			// update votes for each transaction msg from consensus msg
@@ -170,21 +161,7 @@ func (s *InternalService) Processing() {
 			// get messages with votes>=(roundNumber*10)%
 			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 			if err != nil {
-				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-				round++
-				if round < maxRoundNumber {
-					goto checkRound
-				} else {
-					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
-					if err != nil {
-						continue
-					}
-					err = s.broadcastMsg(newBlock.Block, saiP2Paddress)
-					if err != nil {
-						continue
-					}
-					goto startLoop
-				}
+				goto startLoop
 			}
 
 			newConsensusMsg := &models.ConsensusMessage{
@@ -213,9 +190,15 @@ func (s *InternalService) Processing() {
 
 				newConsensusMsg.Hash = newConsensusMsgHash
 
+				err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
+					goto startLoop
+				}
+
 				err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
 				if err != nil {
-					continue
+					goto startLoop
 				}
 
 				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
@@ -225,15 +208,14 @@ func (s *InternalService) Processing() {
 			} else {
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 				if err != nil {
-					continue
+					goto startLoop
 				}
 				err = s.broadcastMsg(newBlock, saiP2Paddress)
 				if err != nil {
-					continue
+					goto startLoop
 				}
 
 				goto startLoop
-
 			}
 		}
 	}

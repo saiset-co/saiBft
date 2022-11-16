@@ -6,7 +6,9 @@ services:
       dockerfile: Dockerfile
     ports:
       - "3305:3305"
-       
+    volumes:
+      - ./saiBtc/build/saibtc.config:/srv/saibtc.config
+
   sai-storage:
     build:
       context: ./saiStorage
@@ -15,7 +17,10 @@ services:
       - "27017:27017"
       - "8801:8801"
       - "8802:8802"
-      
+    volumes:
+      - ./saiStorage/build/config.json:/srv/config.json
+#      - /root/storage_data:/data/db
+
   sai-bft:
     build:
       context: ./saiBft
@@ -24,6 +29,9 @@ services:
       - "8017:8017"
       - "8018:8018"
       - "8019:8019"
+    volumes:
+      - ./saiBft/build/config.yml:/srv/config.yml
+      - ./saiBft/build/btc_keys.json:/srv/btc_keys.json
 
   sai-p2p_proxy:
     build:
@@ -31,11 +39,14 @@ services:
       dockerfile: Dockerfile
     ports:
       - "8071:8071"
+    volumes:
+      - ./saiP2pProxy/build/config.yml:/srv/config.yml
 
   sai-p2p:
     build:
       context: ./saiP2p
       dockerfile: Dockerfile
     ports:
-      - "8112:8112"  
-      
+      - "8112:8112"
+    volumes:
+      - ./saiP2p/build/p2p_lin64.properties:/srv/p2p_lin64.properties
