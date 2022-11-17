@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -40,10 +41,10 @@ func (s *InternalService) Processing() {
 	//btcKeys1, _ := s.getBTCkeys("btc_keys3.json", saiBtcAddress)
 	// btcKeys2, _ := s.getBTCkeys("btc_keys2.json", saiBtcAddress)
 	// btcKeys3, _ := s.getBTCkeys("btc_keys1.json", saiBtcAddress)
-	s.TrustedValidators = append(s.TrustedValidators, s.BTCkeys.Address)
-
-	s.GlobalService.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
-
+	//s.TrustedValidators = append(s.TrustedValidators, s.BTCkeys.Address)
+	//
+	//s.GlobalService.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
+	//
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
@@ -51,15 +52,14 @@ func (s *InternalService) Processing() {
 
 	// get trusted validators from config
 
-	// trustedValidorsInterface, ok := s.GlobalService.Configuration["trusted_validators"].([]interface{})
-	// if !ok {
-	// 	s.GlobalService.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
-	// }
+	trustedValidatorsInterface, ok := s.GlobalService.Configuration["trusted_validators"].([]interface{})
+	if !ok {
+		s.GlobalService.Logger.Fatal("handlers - processing - wrong type of trusted_validators value from config")
+	}
 
-	// for _, validator := range trustedValidorsInterface {
-	// 	s.TrustedValidators = append(s.TrustedValidators, validator.(string))
-
-	// }
+	for _, validator := range trustedValidatorsInterface {
+		s.TrustedValidators = append(s.TrustedValidators, validator.(string))
+	}
 
 	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
 
@@ -394,13 +394,16 @@ func (s *InternalService) getConsensusMsgForTheRound(round, blockNumber int, sto
 
 // broadcast messages to connected nodes
 func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) error {
+	param := url.Values{}
 	data, err := json.Marshal(msg)
+
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round != 0 - broadcastMsg - marshal msg", zap.Error(err))
 		return err
 	}
 
-	postRequest, err := http.NewRequest("POST", saiP2Paddress, bytes.NewBuffer(data))
+	param.Add("message", string(data))
+	postRequest, err := http.NewRequest("POST", saiP2Paddress, bytes.NewBufferString(param.Encode()))
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round != 0 - broadcastMsg - create post request", zap.Error(err))
 		return err
