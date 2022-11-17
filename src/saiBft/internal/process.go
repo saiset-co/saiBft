@@ -140,20 +140,21 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				goto startLoop
 			}
-
-			// update votes for each transaction msg from consensus msg
-			for _, msg := range msgs {
-				// check if consensus message sender is from trusted validators list
-				err = checkConsensusMsgSender(s.TrustedValidators, msg)
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
-					continue
-				}
-				// update votes for each tx message from consensusMsg
-				for _, txMsgHash := range msg.Messages {
-					err = s.updateTxMsgVotes(txMsgHash, storageToken)
+			if round < maxRoundNumber {
+				// update votes for each transaction msg from consensus msg
+				for _, msg := range msgs {
+					// check if consensus message sender is from trusted validators list
+					err = checkConsensusMsgSender(s.TrustedValidators, msg)
 					if err != nil {
+						s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
 						continue
+					}
+					// update votes for each tx message from consensusMsg
+					for _, txMsgHash := range msg.Messages {
+						err = s.updateTxMsgVotes(txMsgHash, storageToken)
+						if err != nil {
+							continue
+						}
 					}
 				}
 			}
