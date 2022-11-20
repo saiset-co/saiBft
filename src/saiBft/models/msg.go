@@ -43,7 +43,6 @@ func (m *ConsensusMessage) GetHash() (string, error) {
 		BlockNumber:   m.BlockNumber,
 		Round:         m.Round,
 		Messages:      m.Messages,
-		Signature:     m.Signature,
 	})
 	if err != nil {
 		return "", err
@@ -84,7 +83,6 @@ func (m *Block) GetHash() (string, error) {
 		PreviousBlockHash: m.PreviousBlockHash,
 		Messages:          m.Messages,
 		SenderAddress:     m.SenderAddress,
-		SenderSignature:   m.SenderSignature,
 	})
 	if err != nil {
 		return "", err
@@ -128,9 +126,8 @@ func (m *TransactionMessage) Validate() error {
 // Hashing block  message
 func (m *Tx) GetHash() (string, error) {
 	b, err := json.Marshal(&Tx{
-		SenderAddress:   m.SenderAddress,
-		Message:         m.Message,
-		SenderSignature: m.SenderSignature,
+		SenderAddress: m.SenderAddress,
+		Message:       m.Message,
 	})
 	if err != nil {
 		return "", err

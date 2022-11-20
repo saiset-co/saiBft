@@ -14,7 +14,7 @@ service:
 #	cd ./src/saiBTC && go mod tidy && go build -o ../../microservices/saiBtc/build/sai-btc
 #	cd ./src/saiP2pProxy && go mod tidy && go build -o ../../microservices/saiP2pProxy/build/sai-p2p
 #	cp ./src/saiP2pProxy/config.yml ./microservices/saiP2pProxy/build/config.yml
-#	cp ./src/saiBft/config.yml ./microservices/saiBft/build/config.yml
+	cp ./src/saiBft/config.yml ./microservices/saiBft/build/config.yml
 #	cp ./src/saiBft/btc_keys.json ./microservices/saiBft/build/btc_keys.json
 	#cp ./src/saiBTC/saibtc.config ./microservices/saiBtc/build/saibtc.config
 	cp ./src/saiStorage/config.json ./microservices/saiStorage/build/config.json
@@ -24,7 +24,7 @@ service:
 docker:
 	docker-compose -f ./microservices/docker-compose.yml up -d --build
 
-`log:
+log:
 	docker-compose -f ./microservices/docker-compose.yml logs -f
 
 logp:
