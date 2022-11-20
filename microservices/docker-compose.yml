@@ -33,7 +33,7 @@ services:
       - ./saiBft/build/config.yml:/srv/config.yml
       - ./saiBft/build/btc_keys.json:/srv/btc_keys.json
 
-  sai-p2p_proxy:
+  sai-p2p-proxy:
     build:
       context: ./saiP2pProxy
       dockerfile: Dockerfile
