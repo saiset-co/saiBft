@@ -1,4 +1,4 @@
-proxy_host: "0.0.0.0"
+proxy_host: "sai-p2p-proxy"
 proxy_port: "8071"
 proxy_endpoint: "send"
 bft_http_host: "sai-bft"

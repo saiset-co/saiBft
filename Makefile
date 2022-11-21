@@ -13,7 +13,7 @@ service:
 	cd ./src/saiBft && go mod tidy && go build -o ../../microservices/saiBft/build/sai-bft
 #	cd ./src/saiBTC && go mod tidy && go build -o ../../microservices/saiBtc/build/sai-btc
 #	cd ./src/saiP2pProxy && go mod tidy && go build -o ../../microservices/saiP2pProxy/build/sai-p2p
-#	cp ./src/saiP2pProxy/config.yml ./microservices/saiP2pProxy/build/config.yml
+	cp ./src/saiP2pProxy/config.yml ./microservices/saiP2pProxy/build/config.yml
 	cp ./src/saiBft/config.yml ./microservices/saiBft/build/config.yml
 #	cp ./src/saiBft/btc_keys.json ./microservices/saiBft/build/btc_keys.json
 	#cp ./src/saiBTC/saibtc.config ./microservices/saiBtc/build/saibtc.config
