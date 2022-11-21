@@ -118,12 +118,6 @@ var HandleTxFromCli = saiService.HandlerElement{
 				Message:       string(txMsgBytes), //todo : tx msg in bytes or struct, not string
 			},
 		}
-		btcResp, err := utils.SignMessage(transactionMessage, saiBtcAddress, Service.BTCkeys.Private)
-		if err != nil {
-			Service.GlobalService.Logger.Error("handlers  - tx - sign tx message", zap.Error(err))
-			return nil, fmt.Errorf("handlers  - tx - sign tx message: %w", err)
-		}
-		transactionMessage.Tx.SenderSignature = btcResp.Signature
 
 		hash, err := transactionMessage.Tx.GetHash()
 		if err != nil {
@@ -131,6 +125,13 @@ var HandleTxFromCli = saiService.HandlerElement{
 			return nil, fmt.Errorf("handlers  - tx - count tx message hash: %w", err)
 		}
 		transactionMessage.Tx.MessageHash = hash
+
+		btcResp, err := utils.SignMessage(transactionMessage, saiBtcAddress, Service.BTCkeys.Private)
+		if err != nil {
+			Service.GlobalService.Logger.Error("handlers  - tx - sign tx message", zap.Error(err))
+			return nil, fmt.Errorf("handlers  - tx - sign tx message: %w", err)
+		}
+		transactionMessage.Tx.SenderSignature = btcResp.Signature
 
 		Service.MsgQueue <- transactionMessage.Tx
 		<-Service.MsgQueue

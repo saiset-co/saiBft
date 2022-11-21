@@ -106,17 +106,18 @@ func (s *InternalService) Processing() {
 
 			consensusMsg.Round = round + 1
 
+			consensusMsg.Hash, err = consensusMsg.GetHash()
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
+				goto startLoop
+			}
+
 			btcResp, err := utils.SignMessage(consensusMsg, saiBtcAddress, s.BTCkeys.Private)
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
 				goto startLoop
 			}
 			consensusMsg.Signature = btcResp.Signature
-			consensusMsg.Hash, err = consensusMsg.GetHash()
-			if err != nil {
-				s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
-				goto startLoop
-			}
 
 			err, _ = s.Storage.Put("ConsensusPool", consensusMsg, storageToken)
 			if err != nil {
@@ -175,13 +176,6 @@ func (s *InternalService) Processing() {
 			}
 			if round < maxRoundNumber {
 				newConsensusMsg.Round = round + 1
-				btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
-					goto startLoop
-				}
-
-				newConsensusMsg.Signature = btcResp.Signature
 
 				newConsensusMsgHash, err := newConsensusMsg.GetHash()
 				if err != nil {
@@ -190,6 +184,14 @@ func (s *InternalService) Processing() {
 				}
 
 				newConsensusMsg.Hash = newConsensusMsgHash
+
+				btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
+					goto startLoop
+				}
+
+				newConsensusMsg.Signature = btcResp.Signature
 
 				err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
 				if err != nil {
@@ -274,18 +276,18 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 		},
 	}
 
-	btcResp, err := utils.SignMessage(block, address, s.BTCkeys.Private)
-	if err != nil {
-		return nil, err
-	}
-	block.Block.SenderSignature = btcResp.Signature
-
 	blockHash, err := block.Block.GetHash()
 	if err != nil {
 		return nil, err
 	}
 	block.BlockHash = blockHash
 	block.Block.BlockHash = blockHash
+
+	btcResp, err := utils.SignMessage(block, address, s.BTCkeys.Private)
+	if err != nil {
+		return nil, err
+	}
+	block.Block.SenderSignature = btcResp.Signature
 
 	s.GlobalService.Logger.Sugar().Debugf("First block created : %+v\n", block) //DEBUG
 
@@ -448,6 +450,14 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 		newBlock.Block.Messages[tx.MessageHash] = tx.Tx
 	}
 
+	blockHash, err := newBlock.Block.GetHash()
+	if err != nil {
+		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - count hash of new block", zap.Error(err))
+		return nil, err
+	}
+	newBlock.BlockHash = blockHash
+	newBlock.Block.BlockHash = blockHash
+
 	btcResp, err := utils.SignMessage(newBlock, saiBTCaddress, s.BTCkeys.Private)
 
 	if err != nil {
@@ -459,14 +469,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.Votes = +1
 	newBlock.Block.SenderSignature = btcResp.Signature
 	newBlock.Signatures = append(newBlock.Signatures, btcResp.Signature)
-
-	blockHash, err := newBlock.Block.GetHash()
-	if err != nil {
-		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - count hash of new block", zap.Error(err))
-		return nil, err
-	}
-	newBlock.BlockHash = blockHash
-	newBlock.Block.BlockHash = blockHash
 
 	err, _ = s.Storage.Put(blockchainCollection, newBlock, storageToken)
 	if err != nil {

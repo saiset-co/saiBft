@@ -18,12 +18,6 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 		},
 	}
 
-	resp, err := utils.SignMessage(testTxMsg, saiBtcAddress, s.BTCkeys.Private)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - sign test tx error", zap.Error(err))
-	}
-	testTxMsg.Tx.SenderSignature = resp.Signature
-
 	testTxHash, err := testTxMsg.Tx.GetHash()
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - hash test tx error", zap.Error(err))
@@ -31,6 +25,12 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 
 	testTxMsg.Tx.MessageHash = testTxHash
 	testTxMsg.MessageHash = testTxHash
+
+	resp, err := utils.SignMessage(testTxMsg, saiBtcAddress, s.BTCkeys.Private)
+	if err != nil {
+		s.GlobalService.Logger.Fatal("processing - sign test tx error", zap.Error(err))
+	}
+	testTxMsg.Tx.SenderSignature = resp.Signature
 
 	err, _ = s.Storage.Put("MessagesPool", testTxMsg, storageToken)
 	if err != nil {
@@ -48,18 +48,18 @@ func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, send
 		Messages:      []string{"0060ee497708e7d9a8428802a6651b93847dca9a0217d05ad67a5a1be7d49223"},
 	}
 
-	resp, err := utils.SignMessage(testConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - sign test consensus error", zap.Error(err))
-	}
-	testConsensusMsg.Signature = resp.Signature
-
 	testConsensusHash, err := testConsensusMsg.GetHash()
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - hash test consensus error", zap.Error(err))
 	}
 
 	testConsensusMsg.Hash = testConsensusHash
+
+	resp, err := utils.SignMessage(testConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
+	if err != nil {
+		s.GlobalService.Logger.Fatal("processing - sign test consensus error", zap.Error(err))
+	}
+	testConsensusMsg.Signature = resp.Signature
 
 	err, _ = s.Storage.Put("ConsensusPool", testConsensusMsg, storageToken)
 	if err != nil {
