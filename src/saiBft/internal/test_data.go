@@ -9,7 +9,7 @@ import (
 // unput data for testing purposes
 
 // save test tx (for testing purposes)
-func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
+func (s *InternalService) saveTestTx(saiBtcAddress, storageToken, saiP2PAddress string) {
 	testTxMsg := &models.TransactionMessage{
 		Votes: 0,
 		Tx: &models.Tx{
@@ -36,6 +36,12 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test tx msg", zap.Error(err))
 	}
+
+	bcErr := s.broadcastMsg(testTxMsg.Tx, saiP2PAddress)
+	if bcErr != nil {
+		s.GlobalService.Logger.Fatal("processing - broadcast test tx msg", zap.Error(err))
+	}
+
 	s.GlobalService.Logger.Sugar().Debugf("test tx message saved") //DEBUG
 }
 

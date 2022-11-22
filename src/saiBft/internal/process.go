@@ -64,7 +64,7 @@ func (s *InternalService) Processing() {
 	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
 
 	//TEST transaction &consensus messages
-	s.saveTestTx(saiBtcAddress, storageToken)
+	s.saveTestTx(saiBtcAddress, storageToken, saiP2Paddress)
 
 	for {
 
