@@ -94,7 +94,7 @@ var HandleTxFromCli = saiService.HandlerElement{
 			Service.GlobalService.Logger.Fatal("wrong type of saiBTC_address value in config")
 		}
 
-		btckeys, err := Service.getBTCkeys("btc_keys.json", saiBtcAddress)
+		btckeys, err := Service.GetBTCkeys("btc_keys.json", saiBtcAddress)
 		if err != nil {
 			Service.GlobalService.Logger.Fatal("listenFromSaiP2P  - handle tx msg - get btc keys", zap.Error(err))
 		}

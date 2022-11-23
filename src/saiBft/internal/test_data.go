@@ -9,9 +9,10 @@ import (
 // unput data for testing purposes
 
 // save test tx (for testing purposes)
-func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
+func (s *InternalService) saveTestTx(saiBtcAddress, storageToken, saiP2PAddress string) {
 	testTxMsg := &models.TransactionMessage{
 		Votes: 0,
+		Type:  models.TransactionMsgType,
 		Tx: &models.Tx{
 			SenderAddress: s.BTCkeys.Address,
 			Message:       "test tx message",
@@ -36,12 +37,18 @@ func (s *InternalService) saveTestTx(saiBtcAddress, storageToken string) {
 	if err != nil {
 		s.GlobalService.Logger.Fatal("processing - put test tx msg", zap.Error(err))
 	}
+
+	bcErr := s.broadcastMsg(testTxMsg.Tx, saiP2PAddress)
+	if bcErr != nil {
+		s.GlobalService.Logger.Fatal("processing - broadcast test tx msg", zap.Error(err))
+	}
 	s.GlobalService.Logger.Sugar().Debugf("test tx message saved") //DEBUG
 }
 
 // save test consensusMsg (for testing purposes)
 func (s *InternalService) saveTestConsensusMsg(saiBtcAddress, storageToken, senderAddress string) {
 	testConsensusMsg := &models.ConsensusMessage{
+		Type:          models.ConsensusMsgType,
 		SenderAddress: senderAddress,
 		BlockNumber:   3,
 		Round:         7,

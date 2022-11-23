@@ -6,6 +6,7 @@ import (
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
 	"github.com/iamthe1whoknocks/saiService"
+	"go.uber.org/zap"
 )
 
 // here we add all implemented handlers, create name of service and register config
@@ -14,8 +15,13 @@ func Init(svc *saiService.Service) {
 	storage := NewDB()
 	Service.Storage = storage
 
-	btckeys, _ := Service.getBTCkeys("btc_keys.json", Service.GlobalService.Configuration["saiBTC_address"].(string))
+	btckeys, err := Service.GetBTCkeys("btc_keys.json", Service.GlobalService.Configuration["saiBTC_address"].(string))
+	if err != nil {
+		svc.Logger.Fatal("main - init - open btc keys", zap.Error(err))
+	}
 	Service.BTCkeys = btckeys
+
+	svc.Logger.Sugar().Debugf("btc keys : %+v\n", Service.BTCkeys) //DEBUG
 
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli

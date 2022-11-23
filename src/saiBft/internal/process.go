@@ -64,7 +64,7 @@ func (s *InternalService) Processing() {
 	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
 
 	//TEST transaction &consensus messages
-	s.saveTestTx(saiBtcAddress, storageToken)
+	s.saveTestTx(saiBtcAddress, storageToken, saiP2Paddress)
 
 	for {
 
@@ -89,6 +89,7 @@ func (s *InternalService) Processing() {
 				s.GlobalService.Logger.Error("process - round == 0 - get zero-voted tx messages", zap.Error(err))
 			}
 			consensusMsg := &models.ConsensusMessage{
+				Type:          models.ConsensusMsgType,
 				SenderAddress: s.BTCkeys.Address,
 				BlockNumber:   block.Block.Number,
 				Round:         round,
@@ -167,6 +168,7 @@ func (s *InternalService) Processing() {
 			}
 
 			newConsensusMsg := &models.ConsensusMessage{
+				Type:          models.ConsensusMsgType,
 				SenderAddress: Service.BTCkeys.Address,
 				BlockNumber:   block.Block.Number,
 			}
@@ -267,6 +269,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 	s.GlobalService.Logger.Sugar().Debugf("block not found, creating initial block") //DEBUG
 
 	block = &models.BlockConsensusMessage{
+		Type:  models.BlockConsensusMsgType,
 		Votes: 0,
 		Block: &models.Block{
 			Number:            1,
@@ -438,6 +441,7 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsensusMessage, saiBTCaddress, storageToken string, txMsgs []*models.TransactionMessage) (*models.BlockConsensusMessage, error) {
 
 	newBlock := &models.BlockConsensusMessage{
+		Type: models.BlockConsensusMsgType,
 		Block: &models.Block{
 			Number:            previousBlock.Block.Number,
 			PreviousBlockHash: previousBlock.BlockHash,
@@ -533,16 +537,16 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 	return filteredTx, nil
 }
 
-func (s *InternalService) getBTCkeys(fileStr, saiBTCaddress string) (*models.BtcKeys, error) {
-	file, err := os.OpenFile(fileStr, os.O_CREATE|os.O_APPEND|os.O_RDWR, 0666)
+func (s *InternalService) GetBTCkeys(fileStr, saiBTCaddress string) (*models.BtcKeys, error) {
+	file, err := os.OpenFile(fileStr, os.O_CREATE|os.O_RDWR, 0666)
 	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - open key btc file", zap.Error(err))
+		s.GlobalService.Logger.Error("processing - open key btc file", zap.Error(err))
 		return nil, err
 	}
 
 	data, err := ioutil.ReadFile(fileStr)
 	if err != nil {
-		s.GlobalService.Logger.Fatal("processing - read key btc file", zap.Error(err))
+		s.GlobalService.Logger.Error("processing - read key btc file", zap.Error(err))
 		return nil, err
 	}
 	btcKeys := models.BtcKeys{}
@@ -552,12 +556,12 @@ func (s *InternalService) getBTCkeys(fileStr, saiBTCaddress string) (*models.Btc
 		s.GlobalService.Logger.Error("get btc keys - error unmarshal from file", zap.Error(err))
 		btcKeys, body, err := utils.GetBtcKeys(saiBTCaddress)
 		if err != nil {
-			s.GlobalService.Logger.Fatal("processing - get btc keys", zap.Error(err))
+			s.GlobalService.Logger.Error("processing - get btc keys", zap.Error(err))
 			return nil, err
 		}
 		_, err = file.Write(body)
 		if err != nil {
-			s.GlobalService.Logger.Fatal("processing - write btc keys to file", zap.Error(err))
+			s.GlobalService.Logger.Error("processing - write btc keys to file", zap.Error(err))
 			return nil, err
 		}
 		return btcKeys, nil
