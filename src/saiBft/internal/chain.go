@@ -39,6 +39,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			msg := &models.TransactionMessage{
 				Tx:          txMsg,
 				MessageHash: txMsg.MessageHash,
+				Type:        models.TransactionMsgType,
 			}
 			err := msg.Validate()
 			if err != nil {

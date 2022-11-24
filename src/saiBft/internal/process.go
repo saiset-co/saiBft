@@ -153,6 +153,15 @@ func (s *InternalService) Processing() {
 					}
 					// update votes for each tx message from consensusMsg
 					for _, txMsgHash := range msg.Messages {
+						err, result := s.Storage.Get("MessagesPool", bson.M{"message_hash": txMsgHash}, bson.M{}, storageToken)
+						if err != nil {
+							s.GlobalService.Logger.Error("process - get msg from consensus msg from storage", zap.Error(err))
+							continue
+						}
+
+						if len(result) == 2 {
+							continue
+						}
 						err = s.updateTxMsgVotes(txMsgHash, storageToken)
 						if err != nil {
 							continue
@@ -515,6 +524,12 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 		return nil, err
 	}
 
+	if len(result) == 2 {
+		if err != nil {
+			s.GlobalService.Logger.Error("process - get tx msgs with certain number of votes - emtpy result")
+			return nil, errors.New("tx msg with certain number of votes was not found")
+		}
+	}
 	data, err := utils.ExtractResult(result)
 	if err != nil {
 		Service.GlobalService.Logger.Error("process - getZeroVotedTransactions - extract data from response", zap.Error(err))
