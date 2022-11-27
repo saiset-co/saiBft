@@ -13,9 +13,9 @@ import (
 )
 
 // send direct get block message to connected nodes
-func SendDirectGetBlockMsg(address string, blockNumber int) ([]*models.BlockConsensusMessage, error) {
-	getBlocksRequest := &models.GetMissedBlocksRequest{
-		LastBlockNumber: blockNumber,
+func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) ([]*models.BlockConsensusMessage, error) {
+	getBlocksRequest := &models.SyncRequest{
+		Number: blockNumber,
 	}
 
 	data, err := json.Marshal(getBlocksRequest)
@@ -25,8 +25,9 @@ func SendDirectGetBlockMsg(address string, blockNumber int) ([]*models.BlockCons
 
 	param := url.Values{}
 	param.Add("message", string(data))
+	param.Add("node", node)
 
-	postRequest, err := http.NewRequest("post", address, strings.NewReader(param.Encode()))
+	postRequest, err := http.NewRequest("POST", saiP2pAddress+"/Send_message_to", strings.NewReader(param.Encode()))
 	if err != nil {
 		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - create post request : %w", err)
 	}

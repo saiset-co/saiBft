@@ -5,7 +5,10 @@ type SaiP2pNode struct {
 	Address string `json:"address"`
 }
 
-// request to get missed blocks from connected nodes
-type GetMissedBlocksRequest struct {
-	LastBlockNumber int `json:"number"`
+type SyncRequest struct {
+	Number int `json:"block_number"`
+}
+
+type SyncResponse struct {
+	Addresses []string `json:"addresses"`
 }

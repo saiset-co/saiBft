@@ -12,9 +12,9 @@ func main() {
 
 	svc.RegisterConfig("config.yml")
 
-	internal.Init(svc)
-
 	internal.Service.GlobalService.RegisterHandlers(internal.Service.Handler)
+
+	internal.Init(svc)
 
 	internal.Service.GlobalService.RegisterInitTask(internal.Service.Init)
 

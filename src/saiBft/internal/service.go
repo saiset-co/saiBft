@@ -26,6 +26,7 @@ func Init(svc *saiService.Service) {
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
 	Service.Handler[HandleMessage.Name] = HandleMessage
+	Service.Handler[CreateBTCKeys.Name] = CreateBTCKeys
 }
 
 type InternalService struct {

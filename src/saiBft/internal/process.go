@@ -21,6 +21,7 @@ import (
 const (
 	blockchainCollection = "Blockchain"
 	maxRoundNumber       = 7
+	btcKeyFile           = "btc_keys.json"
 )
 
 // main process of blockchain

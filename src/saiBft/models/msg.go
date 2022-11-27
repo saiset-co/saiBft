@@ -85,7 +85,6 @@ func (m *Block) GetHash() (string, error) {
 		Number:            m.Number,
 		PreviousBlockHash: m.PreviousBlockHash,
 		Messages:          m.Messages,
-		SenderAddress:     m.SenderAddress,
 	})
 	if err != nil {
 		return "", err

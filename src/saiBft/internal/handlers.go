@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strconv"
 
@@ -106,7 +107,6 @@ var HandleTxFromCli = saiService.HandlerElement{
 		params := args[1:]
 		txMsg.Params = append(txMsg.Params, params...)
 
-		//todo : tx msg in bytes or struct, not string
 		txMsgBytes, err := json.Marshal(txMsg)
 		if err != nil {
 			Service.GlobalService.Logger.Error("handlers - tx  -  marshal tx msg", zap.Error(err))
@@ -115,7 +115,7 @@ var HandleTxFromCli = saiService.HandlerElement{
 		transactionMessage := &models.TransactionMessage{
 			Tx: &models.Tx{
 				SenderAddress: Service.BTCkeys.Address,
-				Message:       string(txMsgBytes), //todo : tx msg in bytes or struct, not string
+				Message:       string(txMsgBytes),
 			},
 		}
 
@@ -191,6 +191,56 @@ var HandleMessage = saiService.HandlerElement{
 		}
 
 		return "ok", nil
+	},
+}
+
+// create btc keys
+// example : keys
+var CreateBTCKeys = saiService.HandlerElement{
+	Name:        "keys",
+	Description: "create btc keys",
+	Function: func(data interface{}) (interface{}, error) {
+		args, ok := data.([]string)
+		if !ok {
+			return nil, errors.New("wrong type for args in cli keys method")
+		}
+		Service.GlobalService.Logger.Debug("got message from cli", zap.Strings("data", args))
+
+		// todo : handle flags if it will be needed
+		// if len(args) != 5 {
+		// 	return nil, errors.New("not enough arguments in cli tx method")
+		// }
+		file, err := os.OpenFile(btcKeyFile, os.O_RDWR, 0666)
+
+		//todo: handle args if file exists
+		if err == nil {
+			Service.GlobalService.Logger.Debug("handlers - create btc keys - open key btc file - keys already exists")
+			return "btc keys file already exists", nil
+		}
+
+		saiBtcAddress, ok := Service.GlobalService.Configuration["saiBTC_address"].(string)
+		if !ok {
+			Service.GlobalService.Logger.Fatal("wrong type of saiBTC_address value in config")
+		}
+
+		btcKeys, body, err := utils.GetBtcKeys(saiBtcAddress)
+		if err != nil {
+			Service.GlobalService.Logger.Error("handlers - create btc keys  - get btc keys", zap.Error(err))
+			return nil, err
+		}
+
+		file, err = os.OpenFile(btcKeyFile, os.O_CREATE|os.O_RDWR, 0666)
+		if err != nil {
+			Service.GlobalService.Logger.Error("handlers - create btc keys  - open key btc file", zap.Error(err))
+			return nil, err
+		}
+		_, err = file.Write(body)
+		if err != nil {
+			Service.GlobalService.Logger.Error("handlers -  - write btc keys to file", zap.Error(err))
+			return nil, err
+		}
+		return btcKeys, nil
+
 	},
 }
 
