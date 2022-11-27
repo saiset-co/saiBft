@@ -490,7 +490,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	}
 
 	for _, tx := range txMsgs {
-		err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash}, storageToken)
+		err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("process - round != 0 - form and save new block - update tx blockhash", zap.Error(err))
 			return nil, err

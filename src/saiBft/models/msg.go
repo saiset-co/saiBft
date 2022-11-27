@@ -10,7 +10,7 @@ import (
 
 const (
 	BlockConsensusMsgType = "blockConsensus"
-	ConsensusMsgType      = "сonsensus"
+	ConsensusMsgType      = "consensus"
 	TransactionMsgType    = "message"
 )
 
@@ -85,7 +85,6 @@ func (m *Block) GetHash() (string, error) {
 		Number:            m.Number,
 		PreviousBlockHash: m.PreviousBlockHash,
 		Messages:          m.Messages,
-		SenderAddress:     m.SenderAddress,
 	})
 	if err != nil {
 		return "", err
@@ -97,7 +96,6 @@ func (m *Block) GetHash() (string, error) {
 
 // Transaction message
 type TransactionMessage struct {
-	Type        string      `json:"type" valid:",required"`
 	MessageHash string      `json:"message_hash" valid:",required"`
 	Tx          *Tx         `json:"message" valid:",required"`
 	Votes       int         `json:"votes"` // additional field, which was not added by Valeriy
@@ -105,10 +103,12 @@ type TransactionMessage struct {
 	VmResult    bool        `json:"vm_result"`
 	VmResponse  interface{} `json:"vm_response"`
 	BlockHash   string      `json:"block_hash"`
+	BlockNumber string      `json:"block_number"`
 }
 
 // transaction struct
 type Tx struct {
+	Type            string `json:"type" valid:",required"`
 	SenderAddress   string `json:"sender_address" valid:",required"`
 	Message         string `json:"message" valid:",required"`
 	SenderSignature string `json:"sender_signature" valid:",required"`

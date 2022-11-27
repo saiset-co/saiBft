@@ -150,11 +150,7 @@ var HandleMessage = saiService.HandlerElement{
 		}
 		Service.GlobalService.Logger.Sugar().Debugf("got message from saiP2p : %+v", m) // DEBUG
 
-		msgType, err := utils.DetectMsgTypeFromMap(m)
-		if err != nil {
-			return nil, err
-		}
-		switch msgType {
+		switch m["type"].(string) {
 		case models.BlockConsensusMsgType:
 			msg := models.BlockConsensusMessage{}
 			b, err := json.Marshal(m)
@@ -188,6 +184,8 @@ var HandleMessage = saiService.HandlerElement{
 				return nil, fmt.Errorf("handlers - handle message - marshal bytes : %w", err)
 			}
 			Service.MsgQueue <- &msg
+		default:
+			return nil, errors.New("handlers - handle message - wrong message type" + m["type"].(string))
 		}
 
 		return "ok", nil
