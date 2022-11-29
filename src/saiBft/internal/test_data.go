@@ -11,9 +11,9 @@ import (
 // save test tx (for testing purposes)
 func (s *InternalService) saveTestTx(saiBtcAddress, storageToken, saiP2PAddress string) {
 	testTxMsg := &models.TransactionMessage{
-		Votes: 0,
-		Type:  models.TransactionMsgType,
+		Votes: [7]uint64{},
 		Tx: &models.Tx{
+			Type:          models.TransactionMsgType,
 			SenderAddress: s.BTCkeys.Address,
 			Message:       "test tx message",
 		},

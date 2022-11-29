@@ -6,9 +6,11 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math"
 	"net/http"
 	"net/url"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/iamthe1whoknocks/bft/models"
@@ -143,33 +145,33 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				goto startLoop
 			}
-			if round < maxRoundNumber {
-				// update votes for each transaction msg from consensus msg
-				for _, msg := range msgs {
-					// check if consensus message sender is from trusted validators list
-					err = checkConsensusMsgSender(s.TrustedValidators, msg)
+			//	if round < maxRoundNumber {
+			// update votes for each transaction msg from consensus msg
+			for _, msg := range msgs {
+				// check if consensus message sender is from trusted validators list
+				err = checkConsensusMsgSender(s.TrustedValidators, msg)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
+					continue
+				}
+				// update votes for each tx message from consensusMsg
+				for _, txMsgHash := range msg.Messages {
+					err, result := s.Storage.Get("MessagesPool", bson.M{"message_hash": txMsgHash}, bson.M{}, storageToken)
 					if err != nil {
-						s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
+						s.GlobalService.Logger.Error("process - get msg from consensus msg from storage", zap.Error(err))
 						continue
 					}
-					// update votes for each tx message from consensusMsg
-					for _, txMsgHash := range msg.Messages {
-						err, result := s.Storage.Get("MessagesPool", bson.M{"message_hash": txMsgHash}, bson.M{}, storageToken)
-						if err != nil {
-							s.GlobalService.Logger.Error("process - get msg from consensus msg from storage", zap.Error(err))
-							continue
-						}
 
-						if len(result) == 2 {
-							continue
-						}
-						err = s.updateTxMsgVotes(txMsgHash, storageToken)
-						if err != nil {
-							continue
-						}
+					if len(result) == 2 {
+						continue
+					}
+					err = s.updateTxMsgVotes(txMsgHash, storageToken, round)
+					if err != nil {
+						continue
 					}
 				}
 			}
+			//}
 
 			// get messages with votes>=(roundNumber*10)%
 			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
@@ -186,39 +188,39 @@ func (s *InternalService) Processing() {
 			for _, txMsg := range txMsgs {
 				newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
 			}
+			newConsensusMsg.Round = round + 1
+
+			newConsensusMsgHash, err := newConsensusMsg.GetHash()
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
+				goto startLoop
+			}
+
+			newConsensusMsg.Hash = newConsensusMsgHash
+
+			btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
+				goto startLoop
+			}
+
+			newConsensusMsg.Signature = btcResp.Signature
+
+			err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
+				goto startLoop
+			}
+
+			err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
+			if err != nil {
+				goto startLoop
+			}
+
+			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
+			round++
+
 			if round < maxRoundNumber {
-				newConsensusMsg.Round = round + 1
-
-				newConsensusMsgHash, err := newConsensusMsg.GetHash()
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
-					goto startLoop
-				}
-
-				newConsensusMsg.Hash = newConsensusMsgHash
-
-				btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
-					goto startLoop
-				}
-
-				newConsensusMsg.Signature = btcResp.Signature
-
-				err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
-					goto startLoop
-				}
-
-				err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
-				if err != nil {
-					goto startLoop
-				}
-
-				time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
-
-				round++
 				goto checkRound
 			} else {
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
@@ -279,8 +281,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 	s.GlobalService.Logger.Sugar().Debugf("block not found, creating initial block") //DEBUG
 
 	block = &models.BlockConsensusMessage{
-		Type:  models.BlockConsensusMsgType,
-		Votes: 0,
+		Type: models.BlockConsensusMsgType,
 		Block: &models.Block{
 			Number:            1,
 			SenderAddress:     s.BTCkeys.Address,
@@ -310,7 +311,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 
 // get messages with votes = 0
 func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*models.TransactionMessage, error) {
-	err, result := s.Storage.Get("MessagesPool", bson.M{"votes": 0}, bson.M{}, storageToken)
+	err, result := s.Storage.Get("MessagesPool", bson.M{"votes.0": 0}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round = 0 - get messages with 0 votes", zap.Error(err))
 		return nil, err
@@ -354,7 +355,7 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 	msg.VmResult = true
 	msg.VmResponse = "vmResponse"
 
-	msg.Votes = +1
+	msg.Votes[0]++
 	filter := bson.M{"message_hash": msg.MessageHash}
 	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse}
 	err, _ = s.Storage.Update("MessagesPool", filter, update, storageToken)
@@ -491,7 +492,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	}
 
 	for _, tx := range txMsgs {
-		err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash}, storageToken)
+		err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("process - round != 0 - form and save new block - update tx blockhash", zap.Error(err))
 			return nil, err
@@ -504,21 +505,33 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 }
 
 // update votes for transaction message
-func (s *InternalService) updateTxMsgVotes(hash, storageToken string) error {
+func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int) error {
+	// DEBUG votes updating
 	criteria := bson.M{"message_hash": hash}
-	update := bson.M{"$inc": bson.M{"votes": 1}}
+	_, result := s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
+	s.GlobalService.Logger.Sugar().Debugf("BEFORE UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
+	/////
+
+	criteria = bson.M{"message_hash": hash}
+	update := bson.M{"$inc": bson.M{"votes." + strconv.Itoa(round): 1}}
 	err, _ := s.Storage.Upsert("MessagesPool", criteria, update, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - round != 0 - get messages for specified round", zap.Error(err))
 		return err
 	}
+
+	// DEBUG votes updating
+	criteria = bson.M{"message_hash": hash}
+	_, result = s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
+	s.GlobalService.Logger.Sugar().Debugf("AFTER UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
+	/////
 	return nil
 }
 
 // get messages with certain number of votes
 func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string, round int) ([]*models.TransactionMessage, error) {
-	requiredVotes := float64(len(s.TrustedValidators)) * float64(round) * 10 / 100
-	filterGte := bson.M{"votes": bson.M{"$gte": requiredVotes}}
+	requiredVotes := math.Ceil(float64(len(s.TrustedValidators)) * float64(round) * 10 / 100)
+	filterGte := bson.M{"votes." + strconv.Itoa(round): bson.M{"$gte": requiredVotes}}
 	err, result := s.Storage.Get("MessagesPool", filterGte, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - round != 0 - get tx messages with specified votes count", zap.Float64("votes count", requiredVotes), zap.Error(err))
@@ -526,14 +539,13 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 	}
 
 	if len(result) == 2 {
-		if err != nil {
-			s.GlobalService.Logger.Error("process - get tx msgs with certain number of votes - emtpy result")
-			return nil, errors.New("tx msg with certain number of votes was not found")
-		}
+		s.GlobalService.Logger.Error("process - get tx msgs with certain number of votes - emtpy result", zap.String("required votes", strconv.Itoa(int(requiredVotes))))
+		return nil, errors.New("tx msg with certain number of votes was not found")
+
 	}
 	data, err := utils.ExtractResult(result)
 	if err != nil {
-		Service.GlobalService.Logger.Error("process - getZeroVotedTransactions - extract data from response", zap.Error(err))
+		Service.GlobalService.Logger.Error("process - getZeroVotedTransactions - extract data from response", zap.String("result", string(result)), zap.Error(err))
 		return nil, err
 	}
 	filteredTx := make([]*models.TransactionMessage, 0)
