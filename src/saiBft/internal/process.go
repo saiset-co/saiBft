@@ -20,6 +20,10 @@ import (
 	"go.uber.org/zap"
 )
 
+var (
+	errNotEnoughVotes = errors.New("tx msg with certain number of votes was not found")
+)
+
 const (
 	blockchainCollection = "Blockchain"
 	maxRoundNumber       = 7
@@ -176,45 +180,59 @@ func (s *InternalService) Processing() {
 			// get messages with votes>=(roundNumber*10)%
 			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 			if err != nil {
-				goto startLoop
+				if errors.Is(err, errNotEnoughVotes) {
+					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
+					if err != nil {
+						goto startLoop
+					}
+					err = s.broadcastMsg(newBlock, saiP2Paddress)
+					if err != nil {
+						goto startLoop
+					}
+
+					goto startLoop
+				} else {
+					goto startLoop
+				}
 			}
+			if round < maxRoundNumber-1 {
+				newConsensusMsg := &models.ConsensusMessage{
+					Type:          models.ConsensusMsgType,
+					SenderAddress: Service.BTCkeys.Address,
+					BlockNumber:   block.Block.Number,
+				}
 
-			newConsensusMsg := &models.ConsensusMessage{
-				Type:          models.ConsensusMsgType,
-				SenderAddress: Service.BTCkeys.Address,
-				BlockNumber:   block.Block.Number,
-			}
+				for _, txMsg := range txMsgs {
+					newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
+				}
+				newConsensusMsg.Round = round + 1
 
-			for _, txMsg := range txMsgs {
-				newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
-			}
-			newConsensusMsg.Round = round + 1
+				newConsensusMsgHash, err := newConsensusMsg.GetHash()
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
+					goto startLoop
+				}
 
-			newConsensusMsgHash, err := newConsensusMsg.GetHash()
-			if err != nil {
-				s.GlobalService.Logger.Error("process - round==0 - hash consensus message", zap.Error(err))
-				goto startLoop
-			}
+				newConsensusMsg.Hash = newConsensusMsgHash
 
-			newConsensusMsg.Hash = newConsensusMsgHash
+				btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
+					goto startLoop
+				}
 
-			btcResp, err := utils.SignMessage(newConsensusMsg, saiBtcAddress, s.BTCkeys.Private)
-			if err != nil {
-				s.GlobalService.Logger.Error("process - round==0 - sign consensus message", zap.Error(err))
-				goto startLoop
-			}
+				newConsensusMsg.Signature = btcResp.Signature
 
-			newConsensusMsg.Signature = btcResp.Signature
+				err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
+					goto startLoop
+				}
 
-			err, _ = s.Storage.Put("ConsensusPool", newConsensusMsg, storageToken)
-			if err != nil {
-				s.GlobalService.Logger.Error("process - round == 0 - put consensus to ConsensusPool collection", zap.Error(err))
-				goto startLoop
-			}
-
-			err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
-			if err != nil {
-				goto startLoop
+				err = s.broadcastMsg(newConsensusMsg, saiP2Paddress)
+				if err != nil {
+					goto startLoop
+				}
 			}
 
 			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
@@ -223,6 +241,7 @@ func (s *InternalService) Processing() {
 			if round < maxRoundNumber {
 				goto checkRound
 			} else {
+				s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 				if err != nil {
 					goto startLoop
@@ -540,8 +559,7 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 
 	if len(result) == 2 {
 		s.GlobalService.Logger.Error("process - get tx msgs with certain number of votes - emtpy result", zap.String("required votes", strconv.Itoa(int(requiredVotes))))
-		return nil, errors.New("tx msg with certain number of votes was not found")
-
+		return nil, errNotEnoughVotes
 	}
 	data, err := utils.ExtractResult(result)
 	if err != nil {
