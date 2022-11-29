@@ -181,6 +181,7 @@ func (s *InternalService) Processing() {
 			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 			if err != nil {
 				if errors.Is(err, errNotEnoughVotes) {
+					//todo : txMsgs here is nil!
 					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 					if err != nil {
 						goto startLoop
