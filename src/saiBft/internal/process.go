@@ -476,13 +476,6 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 
 // form and save new block
 func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsensusMessage, saiBTCaddress, storageToken string, txMsgs []*models.TransactionMessage) (*models.BlockConsensusMessage, error) {
-	err := s.updateTxMsgZeroVotes(storageToken)
-
-	if err != nil {
-		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - clear messages", zap.Error(err))
-		return nil, err
-	}
-
 	newBlock := &models.BlockConsensusMessage{
 		Type: models.BlockConsensusMsgType,
 		Block: &models.Block{
@@ -529,6 +522,12 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 			s.GlobalService.Logger.Error("process - round != 0 - form and save new block - update tx blockhash", zap.Error(err))
 			return nil, err
 		}
+	}
+
+	err = s.updateTxMsgZeroVotes(storageToken)
+	if err != nil {
+		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - clear messages", zap.Error(err))
+		return nil, err
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
