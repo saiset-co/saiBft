@@ -30,6 +30,9 @@ log:
 logp:
 	docker-compose -f ./microservices/docker-compose.yml logs -f sai-p2p
 
+logpr:
+	docker-compose -f ./microservices/docker-compose.yml logs -f sai-p2p-proxy
+
 logb:
 	docker-compose -f ./microservices/docker-compose.yml logs -f sai-bft
 

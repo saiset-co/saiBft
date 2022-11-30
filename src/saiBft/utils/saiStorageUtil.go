@@ -75,6 +75,8 @@ func (db Database) Upsert(collectionName string, criteria interface{}, data inte
 func (db Database) makeRequest(method string, request StorageRequest, token string) (error, []byte) {
 	jsonStr, jsonErr := request.toJson()
 
+	fmt.Println("Storage request:", string(jsonStr))
+
 	if jsonErr != nil {
 		fmt.Println("Database request error: ", jsonErr)
 		return jsonErr, []byte("")
