@@ -149,6 +149,7 @@ func (s *InternalService) Processing() {
 			if err != nil {
 				goto startLoop
 			}
+
 			//	if round < maxRoundNumber {
 			// update votes for each transaction msg from consensus msg
 			for _, msg := range msgs {
@@ -181,7 +182,7 @@ func (s *InternalService) Processing() {
 			txMsgs, err := s.getTxMsgsWithCertainNumberOfVotes(storageToken, round)
 			if err != nil {
 				if errors.Is(err, errNotEnoughVotes) {
-					//todo : txMsgs here is nil!
+					s.GlobalService.Logger.Error("process - getTxMsgsWithCertainNumberOfVotes error", zap.Error(err))
 					newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 					if err != nil {
 						goto startLoop
@@ -196,6 +197,7 @@ func (s *InternalService) Processing() {
 					goto startLoop
 				}
 			}
+
 			if round < maxRoundNumber-1 {
 				newConsensusMsg := &models.ConsensusMessage{
 					Type:          models.ConsensusMsgType,
@@ -243,6 +245,7 @@ func (s *InternalService) Processing() {
 				goto checkRound
 			} else {
 				s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
+
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
 				if err != nil {
 					goto startLoop
@@ -470,6 +473,12 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 
 // form and save new block
 func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsensusMessage, saiBTCaddress, storageToken string, txMsgs []*models.TransactionMessage) (*models.BlockConsensusMessage, error) {
+	err := s.updateTxMsgZeroVotes(storageToken)
+
+	if err != nil {
+		s.GlobalService.Logger.Error("process - round != 0 - form and save new block - clear messages", zap.Error(err))
+		return nil, err
+	}
 
 	newBlock := &models.BlockConsensusMessage{
 		Type: models.BlockConsensusMsgType,
@@ -524,6 +533,27 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	return newBlock, nil
 }
 
+// update votes to zero for transaction message
+func (s *InternalService) updateTxMsgZeroVotes(storageToken string) error {
+	criteria := bson.M{"votes.0": bson.M{"$gte": 1}, "block_hash": ""}
+	update := bson.M{"votes": bson.A{0, 0, 0, 0, 0, 0, 0}}
+
+	_, result := s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
+	s.GlobalService.Logger.Sugar().Debugf("BEFORE UPDATING ON CLEAR RESULT : %s", string(result))
+
+	err, _ := s.Storage.Update("MessagesPool", criteria, update, storageToken)
+	if err != nil {
+		s.GlobalService.Logger.Error("handlers - process - round != 0 - get messages for specified round", zap.Error(err))
+		return err
+	}
+
+	criteria2 := bson.M{"block_hash": ""}
+	_, result2 := s.Storage.Get("MessagesPool", criteria2, bson.M{}, storageToken)
+	s.GlobalService.Logger.Sugar().Debugf("AFTER UPDATING ON CLEAR RESULT : %s", string(result2))
+
+	return nil
+}
+
 // update votes for transaction message
 func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int) error {
 	// DEBUG votes updating
@@ -552,6 +582,9 @@ func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int)
 func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string, round int) ([]*models.TransactionMessage, error) {
 	requiredVotes := math.Ceil(float64(len(s.TrustedValidators)) * float64(round) * 10 / 100)
 	filterGte := bson.M{"votes." + strconv.Itoa(round): bson.M{"$gte": requiredVotes}}
+	filteredTx := make([]*models.TransactionMessage, 0)
+	txMsgs := make([]*models.TransactionMessage, 0)
+
 	err, result := s.Storage.Get("MessagesPool", filterGte, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handlers - process - round != 0 - get tx messages with specified votes count", zap.Float64("votes count", requiredVotes), zap.Error(err))
@@ -560,15 +593,14 @@ func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string,
 
 	if len(result) == 2 {
 		s.GlobalService.Logger.Error("process - get tx msgs with certain number of votes - emtpy result", zap.String("required votes", strconv.Itoa(int(requiredVotes))))
-		return nil, errNotEnoughVotes
+		return filteredTx, nil
 	}
+
 	data, err := utils.ExtractResult(result)
 	if err != nil {
 		Service.GlobalService.Logger.Error("process - getZeroVotedTransactions - extract data from response", zap.String("result", string(result)), zap.Error(err))
 		return nil, err
 	}
-	filteredTx := make([]*models.TransactionMessage, 0)
-	txMsgs := make([]*models.TransactionMessage, 0)
 
 	err = json.Unmarshal(data, &txMsgs)
 	if err != nil {
