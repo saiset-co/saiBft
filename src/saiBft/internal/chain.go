@@ -75,13 +75,8 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				continue
 			}
 
-			//err = s.broadcastMsg(msg.Tx, saiP2Paddress)
-			//if err != nil {
-			//	Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
-			//	continue
-			//}
 			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
-			s.MsgQueue <- struct{}{}
+			//s.MsgQueue <- struct{}{}
 
 		case *models.ConsensusMessage:
 			msg := data.(*models.ConsensusMessage)
