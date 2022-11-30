@@ -159,6 +159,9 @@ func (s *InternalService) Processing() {
 					s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
 					continue
 				}
+
+				s.GlobalService.Logger.Sugar().Debugf("Consensus message transactions: %v", msg.Messages) //DEBUG
+
 				// update votes for each tx message from consensusMsg
 				for _, txMsgHash := range msg.Messages {
 					err, result := s.Storage.Get("MessagesPool", bson.M{"message_hash": txMsgHash}, bson.M{}, storageToken)
