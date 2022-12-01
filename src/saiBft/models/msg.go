@@ -10,7 +10,7 @@ import (
 
 const (
 	BlockConsensusMsgType = "blockConsensus"
-	ConsensusMsgType      = "сonsensus"
+	ConsensusMsgType      = "consensus"
 	TransactionMsgType    = "message"
 )
 
@@ -22,6 +22,7 @@ type P2pMsg struct {
 
 // Consensus message
 type ConsensusMessage struct {
+	Type          string   `json:"type" valid:",required"`
 	SenderAddress string   `json:"sender_address" valid:",required"`
 	BlockNumber   int      `json:"block_number" valid:",required"`
 	Round         int      `json:"round" valid:",required"`
@@ -39,11 +40,11 @@ func (m *ConsensusMessage) Validate() error {
 // Hashing consensus message
 func (m *ConsensusMessage) GetHash() (string, error) {
 	b, err := json.Marshal(&ConsensusMessage{
+		Type:          m.Type,
 		SenderAddress: m.SenderAddress,
 		BlockNumber:   m.BlockNumber,
 		Round:         m.Round,
 		Messages:      m.Messages,
-		Signature:     m.Signature,
 	})
 	if err != nil {
 		return "", err
@@ -55,6 +56,7 @@ func (m *ConsensusMessage) GetHash() (string, error) {
 
 // BlockConsensus message
 type BlockConsensusMessage struct {
+	Type       string   `json:"type" valid:",required"`
 	BlockHash  string   `json:"block_hash" valid:",required"`
 	Votes      int      `json:"votes"` // additional field, which was not added by Valeriy
 	Block      *Block   `json:"block" valid:",required"`
@@ -83,8 +85,6 @@ func (m *Block) GetHash() (string, error) {
 		Number:            m.Number,
 		PreviousBlockHash: m.PreviousBlockHash,
 		Messages:          m.Messages,
-		SenderAddress:     m.SenderAddress,
-		SenderSignature:   m.SenderSignature,
 	})
 	if err != nil {
 		return "", err
@@ -98,15 +98,17 @@ func (m *Block) GetHash() (string, error) {
 type TransactionMessage struct {
 	MessageHash string      `json:"message_hash" valid:",required"`
 	Tx          *Tx         `json:"message" valid:",required"`
-	Votes       int         `json:"votes"` // additional field, which was not added by Valeriy
+	Votes       [7]uint64   `json:"votes"`
 	VmProcessed bool        `json:"vm_processed"`
 	VmResult    bool        `json:"vm_result"`
 	VmResponse  interface{} `json:"vm_response"`
 	BlockHash   string      `json:"block_hash"`
+	BlockNumber int         `json:"block_number"`
 }
 
 // transaction struct
 type Tx struct {
+	Type            string `json:"type" valid:",required"`
 	SenderAddress   string `json:"sender_address" valid:",required"`
 	Message         string `json:"message" valid:",required"`
 	SenderSignature string `json:"sender_signature" valid:",required"`
@@ -128,9 +130,8 @@ func (m *TransactionMessage) Validate() error {
 // Hashing block  message
 func (m *Tx) GetHash() (string, error) {
 	b, err := json.Marshal(&Tx{
-		SenderAddress:   m.SenderAddress,
-		Message:         m.Message,
-		SenderSignature: m.SenderSignature,
+		SenderAddress: m.SenderAddress,
+		Message:       m.Message,
 	})
 	if err != nil {
 		return "", err

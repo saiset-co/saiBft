@@ -9,4 +9,3 @@ RUN chmod +x ./sai-p2p
 CMD ./sai-p2p
 
 EXPOSE 8071
-

@@ -135,6 +135,8 @@ func (s *Service) handleHttpConnections(resp http.ResponseWriter, req *http.Requ
 		return
 	}
 
+	defer req.Body.Close()
+
 	decoderErr := json.Unmarshal(body, &message)
 	if decoderErr != nil {
 		err := j{"Status": "NOK", "Error": decoderErr.Error()}

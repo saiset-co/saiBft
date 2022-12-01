@@ -34,6 +34,8 @@ func main() {
 	cfg.AllowAllOrigins = true
 
 	r.POST(config.ProxyEndpoint, config.handler)
+	r.GET("/check", config.check)
+	r.GET("/sync", config.sync)
 
 	r.Run(fmt.Sprintf("%s:%s", config.Host, config.Port))
 }
@@ -98,4 +100,14 @@ func NewConfig(configPath string) (*Config, error) {
 	}
 
 	return config, nil
+}
+
+func (cfg *Config) check(c *gin.Context) {
+	c.JSON(200, "check ok")
+	return
+}
+
+func (cfg *Config) sync(c *gin.Context) {
+	c.JSON(200, "check ok")
+	return
 }

@@ -7,11 +7,12 @@
     enabled: true
     port: 8019
   storage_token: "12345"
-  trusted_validators: []
-  sleep: 2
+  trusted_validators: ["15ycVNQF21PzUBFuKXgpKdekFxoRkH4LFT","1Bit5YxmptszS8JUfF7w3jhuw3wBNdLrHV","1Eukku2F7FDM5M4DyC8CHdF31kiNro6ELz"]
+  sleep: 10
   storage_url: "http://sai-storage:8801"
   storage_email: "ddd@mial.com"
   storage_password: "fdfsdf"
   saiBTC_address: "http://sai-btc:3305"
-  saiP2P_address: "http://sai-p2p:8112"
+  saiP2P_address: "http://sai-p2p:8112/Send_message"
   log_mode: "debug"
+  saiProxy_address: "http://sai-p2p-proxy:8071"
