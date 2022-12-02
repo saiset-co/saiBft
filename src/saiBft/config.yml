@@ -13,6 +13,7 @@
   storage_email: "ddd@mial.com"
   storage_password: "fdfsdf"
   saiBTC_address: "http://sai-btc:3305"
-  saiP2P_address: "http://sai-p2p:8112/Send_message"
+  saiP2P_address: "http://sai-p2p:8112"
   log_mode: "debug"
   saiProxy_address: "http://sai-p2p-proxy:8071"
+  nodes_blacklist: ["18.218.186.169:9971"]

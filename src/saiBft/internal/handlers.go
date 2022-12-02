@@ -80,13 +80,25 @@ var HandleTxFromCli = saiService.HandlerElement{
 	Name:        "tx",
 	Description: "handle tx message",
 	Function: func(data interface{}) (interface{}, error) {
-		args, ok := data.([]string)
-		if !ok {
-			return nil, errors.New("wrong type for args in cli tx method")
+		argsStr := make([]string, 0)
+		switch args := data.(type) {
+		case []string:
+			argsStr = args
+		case []interface{}:
+			for _, iface := range args {
+				strArg, ok := iface.(string)
+				if !ok {
+					return nil, fmt.Errorf("wrong argument type in tx data, argument : [%s],type  :[%s]", iface, reflect.TypeOf(data))
+				}
+				argsStr = append(argsStr, strArg)
+			}
+		default:
+			return nil, fmt.Errorf("wrong type for args in cli tx method, current type :%s", reflect.TypeOf(data))
 		}
-		Service.GlobalService.Logger.Debug("got message from cli", zap.Strings("data", args))
 
-		if len(args) != 5 {
+		Service.GlobalService.Logger.Debug("got message from cli", zap.Strings("data", argsStr))
+
+		if len(argsStr) != 5 {
 			return nil, errors.New("not enough arguments in cli tx method")
 		}
 
@@ -102,9 +114,9 @@ var HandleTxFromCli = saiService.HandlerElement{
 		Service.BTCkeys = btckeys
 
 		txMsg := &models.TxMessage{
-			Method: args[0],
+			Method: argsStr[0],
 		}
-		params := args[1:]
+		params := argsStr[1:]
 		txMsg.Params = append(txMsg.Params, params...)
 
 		txMsgBytes, err := json.Marshal(txMsg)
@@ -113,7 +125,9 @@ var HandleTxFromCli = saiService.HandlerElement{
 			return nil, fmt.Errorf("handlers - tx  -  marshal tx msg: %w", err)
 		}
 		transactionMessage := &models.TransactionMessage{
+
 			Tx: &models.Tx{
+				Type:          models.TransactionMsgType,
 				SenderAddress: Service.BTCkeys.Address,
 				Message:       string(txMsgBytes),
 			},

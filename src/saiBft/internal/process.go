@@ -442,7 +442,7 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 	}
 
 	param.Add("message", string(data))
-	postRequest, err := http.NewRequest("POST", saiP2Paddress, bytes.NewBufferString(param.Encode()))
+	postRequest, err := http.NewRequest("POST", saiP2Paddress+"/Send_message", bytes.NewBufferString(param.Encode()))
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round != 0 - broadcastMsg - create post request", zap.Error(err))
 		return err
@@ -557,12 +557,12 @@ func (s *InternalService) updateTxMsgZeroVotes(storageToken string) error {
 // update votes for transaction message
 func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int) error {
 	// DEBUG votes updating
-	criteria := bson.M{"message_hash": hash}
-	_, result := s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
-	s.GlobalService.Logger.Sugar().Debugf("BEFORE UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
+	// criteria := bson.M{"message_hash": hash}
+	// _, result := s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
+	// s.GlobalService.Logger.Sugar().Debugf("BEFORE UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
 	/////
 
-	criteria = bson.M{"message_hash": hash}
+	criteria := bson.M{"message_hash": hash}
 	update := bson.M{"$inc": bson.M{"votes." + strconv.Itoa(round): 1}}
 	err, _ := s.Storage.Upsert("MessagesPool", criteria, update, storageToken)
 	if err != nil {
@@ -571,9 +571,9 @@ func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int)
 	}
 
 	// DEBUG votes updating
-	criteria = bson.M{"message_hash": hash}
-	_, result = s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
-	s.GlobalService.Logger.Sugar().Debugf("AFTER UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
+	// criteria = bson.M{"message_hash": hash}
+	// _, result = s.Storage.Get("MessagesPool", criteria, bson.M{}, storageToken)
+	// s.GlobalService.Logger.Sugar().Debugf("AFTER UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
 	/////
 	return nil
 }

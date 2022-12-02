@@ -173,7 +173,7 @@ func (s *InternalService) sendDirectGetBlockMsg(lastBlockNumber int, saiP2pProxy
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
 	tempMap := make(map[*models.BlockConsensusMessage]int)
 
-	addresses, err := utils.GetConnectedNodesAddresses(saiP2pProxyAddress, lastBlockNumber)
+	addresses, err := utils.GetConnectedNodesAddresses(saiP2pProxyAddress, s.GlobalService.Configuration["nodes_blacklist"].([]string))
 	if err != nil {
 		s.GlobalService.Logger.Error("chain - handleBlockConsensusMsg - sendDirectGetBlockMsg", zap.Error(err))
 		return nil, err
@@ -284,7 +284,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 				return err
 			}
 			s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockchain collection, blockCandidate : %+v\n", msg) // DEBUG
-			return nil
+			err = s.GetBlockchainMissedBlocks(msg.Block.Number)
 		} else {
 			err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
 			if err != nil {
@@ -320,6 +320,36 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 		err = s.updateBlockchain(msg, &blockCandidate, saiP2pProxyAddress, storageToken, saiP2pAddress)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
+			return err
+		}
+	}
+	return nil
+
+}
+
+// get blockchain missed blocks
+// send direct get block message to connected nodes
+// get blocks from n to current
+func (s *InternalService) GetBlockchainMissedBlocks(blockNumber int) error {
+	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
+	if !ok {
+		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
+	}
+	blacklist, ok := s.GlobalService.Configuration["nodes_blacklist"].([]string)
+	if !ok {
+		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
+	}
+
+	connectedNodes, err := utils.GetConnectedNodesAddresses(saiP2Paddress, blacklist)
+	if err != nil {
+		s.GlobalService.Logger.Error(err.Error())
+		return err
+	}
+	//todo : func is not ready yet
+	for _, node := range connectedNodes {
+		_, err := utils.SendDirectGetBlockMsg(node, blockNumber, saiP2Paddress)
+		if err != nil {
+			s.GlobalService.Logger.Error(err.Error())
 			return err
 		}
 	}
