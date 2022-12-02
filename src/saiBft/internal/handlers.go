@@ -147,6 +147,16 @@ var HandleTxFromCli = saiService.HandlerElement{
 		}
 		transactionMessage.Tx.SenderSignature = btcResp.Signature
 
+		saiP2Paddress, ok := Service.GlobalService.Configuration["saiP2P_address"].(string)
+		if !ok {
+			Service.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
+		}
+
+		err = Service.broadcastMsg(transactionMessage.Tx, saiP2Paddress)
+		if err != nil {
+			Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
+		}
+
 		Service.MsgQueue <- transactionMessage.Tx
 		<-Service.MsgQueue
 		return "ok", nil
@@ -156,7 +166,7 @@ var HandleTxFromCli = saiService.HandlerElement{
 // handle message from saiP2p
 var HandleMessage = saiService.HandlerElement{
 	Name:        "message",
-	Description: "handle  message from saiP2p",
+	Description: "handle message from saiP2p",
 	Function: func(data interface{}) (interface{}, error) {
 		m, ok := data.(map[string]interface{})
 		if !ok {
@@ -182,10 +192,12 @@ var HandleMessage = saiService.HandlerElement{
 			msg := models.ConsensusMessage{}
 			b, err := json.Marshal(m)
 			if err != nil {
+				Service.GlobalService.Logger.Sugar().Error(err) // DEBUG
 				return nil, fmt.Errorf("handlers - handle message - unmarshal : %w", err)
 			}
 			err = json.Unmarshal(b, &msg)
 			if err != nil {
+				Service.GlobalService.Logger.Sugar().Error(err) // DEBUG
 				return nil, fmt.Errorf("handlers - handle message - marshal bytes : %w", err)
 			}
 			Service.MsgQueue <- &msg

@@ -58,19 +58,25 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				continue
 			}
 
+			err, result := s.Storage.Get("MessagesPool", msg, bson.M{}, storageToken)
+			if err != nil {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - get from storage", zap.Error(err))
+				continue
+			}
+
+			if len(result) > 2 {
+				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - we have sent this message", zap.Error(err))
+				continue
+			}
+
 			err, _ = s.Storage.Put("MessagesPool", msg, storageToken)
 			if err != nil {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - transactionMsg - put to storage", zap.Error(err))
 				continue
 			}
 
-			err = s.broadcastMsg(msg.Tx, saiP2Paddress)
-			if err != nil {
-				Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
-				continue
-			}
 			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
-			s.MsgQueue <- struct{}{}
+			//s.MsgQueue <- struct{}{}
 
 		case *models.ConsensusMessage:
 			msg := data.(*models.ConsensusMessage)

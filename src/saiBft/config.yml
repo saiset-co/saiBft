@@ -7,8 +7,8 @@
     enabled: true
     port: 8019
   storage_token: "12345"
-  trusted_validators: ["15ycVNQF21PzUBFuKXgpKdekFxoRkH4LFT","1Bit5YxmptszS8JUfF7w3jhuw3wBNdLrHV","1Eukku2F7FDM5M4DyC8CHdF31kiNro6ELz","14qnvVK3bL7ravP2zbwUDZovs1JvKnWG3h"]
-  sleep: 2
+  trusted_validators: ["15ycVNQF21PzUBFuKXgpKdekFxoRkH4LFT","1Bit5YxmptszS8JUfF7w3jhuw3wBNdLrHV","1Eukku2F7FDM5M4DyC8CHdF31kiNro6ELz"]
+  sleep: 10
   storage_url: "http://sai-storage:8801"
   storage_email: "ddd@mial.com"
   storage_password: "fdfsdf"
