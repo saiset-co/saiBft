@@ -363,9 +363,17 @@ func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*mode
 		return nil, err
 	}
 
-	s.GlobalService.Logger.Sugar().Debugf("Got transactions with votes = 0 : %+v", transactions) //DEBUG
+	filteredTx := make([]*models.TransactionMessage, 0)
 
-	return transactions, nil
+	for _, tx := range transactions {
+		if tx.BlockNumber == 0 && tx.BlockHash == "" {
+			filteredTx = append(filteredTx, tx)
+		}
+	}
+
+	s.GlobalService.Logger.Sugar().Debugf("Got transactions with votes = 0 : %+v", filteredTx) //DEBUG
+
+	return filteredTx, nil
 }
 
 // validate/execute each message, update message and hash and vote for valid messages
