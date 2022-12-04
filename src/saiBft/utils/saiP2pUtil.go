@@ -15,13 +15,8 @@ import (
 )
 
 // send direct get block message to connected nodes
-func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string, ipAddr string) error {
-	getBlocksRequest := &models.SyncRequest{
-		To:      blockNumber,
-		Address: ipAddr,
-	}
-
-	data, err := json.Marshal(getBlocksRequest)
+func SendDirectGetBlockMsg(node string, req *models.SyncRequest, saiP2pAddress string) error {
+	data, err := json.Marshal(req)
 	if err != nil {
 		return fmt.Errorf("chain - sendDirectGetBlockMsg - marshal request : %w", err)
 	}

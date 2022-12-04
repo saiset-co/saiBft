@@ -155,7 +155,8 @@ func (p *Proxy) sync(c *gin.Context) {
 		log.Println(err)
 		c.Writer.Write([]byte(err.Error()))
 	}
-	criteria := bson.M{}
+
+	filterGte := bson.M{"block.number": bson.M{"$lte": syncReq.To}, "block.number": bson.M{"$gte": syncReq.From}}
 	err, result := p.Storage.Get("Blockchain")
 
 }

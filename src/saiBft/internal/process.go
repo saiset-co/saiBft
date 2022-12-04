@@ -103,8 +103,14 @@ func (s *InternalService) Processing() {
 	s.saveTestTx(saiBtcAddress, storageToken, saiP2Paddress)
 
 	for {
-
 	startLoop:
+		select {
+		case <-s.GoToStartLoopCh:
+			s.GlobalService.Logger.Debug("signal from chain was got, move to startLoop")
+			goto startLoop
+		default:
+		}
+		s.Round7State = false
 		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
 		time.Sleep(1 * time.Second)                          //DEBUG
@@ -115,8 +121,6 @@ func (s *InternalService) Processing() {
 			continue
 		}
 	checkRound:
-		// for testing purposes
-
 		s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 		if round == 0 {
 			// get messages with votes = 0
@@ -252,12 +256,15 @@ func (s *InternalService) Processing() {
 				}
 			}
 
-			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
 			round++
+
+			time.Sleep(time.Duration(s.GlobalService.Configuration["sleep"].(int)) * time.Second)
 
 			if round < maxRoundNumber {
 				goto checkRound
 			} else {
+				s.Round7State = true
+
 				s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)

@@ -50,12 +50,14 @@ type InternalService struct {
 	ConnectedSaiP2pNodes map[string]*models.SaiP2pNode
 	BTCkeys              *models.BtcKeys
 	MsgQueue             chan interface{}
-	InitialSignalCh      chan struct{} // chan for notification, if initial block consensusmsg was got already
+	InitialSignalCh      chan struct{} // chan for notification, if initial block consensus msg was got already
 	IsInitialized        bool          // if inital block consensus msg was got or timeout was passed
 	Storage              utils.Database
 	IpAddress            string // outbound ip address
 	MissedBlocksQueue    chan *models.SyncResponse
 	SkipInitializating   bool // first node mode, if true
+	Round7State          bool // if process at the moment at 7 round
+	GoToStartLoopCh      chan struct{}
 }
 
 // global handler for registering handlers
@@ -67,4 +69,7 @@ var Service = &InternalService{
 	MissedBlocksQueue:    make(chan *models.SyncResponse),
 	InitialSignalCh:      make(chan struct{}),
 	IsInitialized:        false,
+	SkipInitializating:   false,
+	Round7State:          false,
+	GoToStartLoopCh:      make(chan struct{}),
 }
