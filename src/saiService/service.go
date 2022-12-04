@@ -9,6 +9,7 @@ import (
 
 	"github.com/urfave/cli/v2"
 	"go.uber.org/zap"
+	"go.uber.org/zap/zapcore"
 	"gopkg.in/yaml.v3"
 )
 
@@ -160,20 +161,25 @@ func (s *Service) StartTasks() {
 }
 
 func (s *Service) SetLogger() {
+
 	var (
 		logger *zap.Logger
 		err    error
 	)
+	config := zap.NewDevelopmentConfig()
+	config.EncoderConfig.EncodeLevel = zapcore.CapitalColorLevelEncoder
 
 	mode := s.Configuration["log_mode"].(string)
 	if mode == "debug" {
-		logger, err = zap.NewDevelopment(zap.AddStacktrace(zap.DPanicLevel))
+		option := zap.AddStacktrace(zap.DPanicLevel)
+		logger, err = config.Build(option)
 		if err != nil {
 			log.Fatal("error creating logger : ", err.Error())
 		}
 		logger.Debug("Logger started", zap.String("mode", "debug"))
 	} else {
-		logger, err = zap.NewProduction(zap.AddStacktrace(zap.DPanicLevel))
+		option := zap.AddStacktrace(zap.DPanicLevel)
+		logger, err = config.Build(option)
 		if err != nil {
 			log.Fatal("error creating logger : ", err.Error())
 		}

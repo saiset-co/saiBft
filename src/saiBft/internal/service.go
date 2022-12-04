@@ -29,6 +29,13 @@ func Init(svc *saiService.Service) {
 	svc.Logger.Debug("node address : ", zap.String("ip address", Service.IpAddress)) //DEBUG
 	svc.Logger.Sugar().Debugf("btc keys : %+v\n", Service.BTCkeys)                   //DEBUG
 
+	skipInitializating, ok := Service.GlobalService.Configuration["skip_initializating"].(bool)
+	if !ok {
+		svc.Logger.Fatal("handlers - processing - wrong type of skip initializating value from config")
+	}
+
+	Service.SkipInitializating = skipInitializating
+
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
 	Service.Handler[HandleMessage.Name] = HandleMessage
@@ -48,6 +55,7 @@ type InternalService struct {
 	Storage              utils.Database
 	IpAddress            string // outbound ip address
 	MissedBlocksQueue    chan *models.SyncResponse
+	SkipInitializating   bool // first node mode, if true
 }
 
 // global handler for registering handlers

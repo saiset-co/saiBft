@@ -46,7 +46,7 @@ var GetMissedBlocks = saiService.HandlerElement{
 		}
 
 		filterGte := bson.M{"block.number": bson.M{"$lte": blockNumber}}
-		err, response := Service.Storage.Get(blockchainCollection, filterGte, bson.M{}, storageToken)
+		err, response := Service.Storage.Get(blockchainCol, filterGte, bson.M{}, storageToken)
 		if err != nil {
 			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - get blocks from storage", zap.Error(err))
 			return nil, fmt.Errorf("handlers - GetMissedBlocks - get blocks from storage : %w", err)

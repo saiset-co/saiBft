@@ -19,3 +19,4 @@
   saiProxy_address: "http://sai-p2p-proxy:8071"
   nodes_blacklist: ["18.218.186.169:9971"]
   initial_block_consensus_timeout_sec: 20 
+  skip_initializating: true

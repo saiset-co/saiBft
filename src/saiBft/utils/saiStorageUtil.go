@@ -72,6 +72,11 @@ func (db Database) Upsert(collectionName string, criteria interface{}, data inte
 	return db.makeRequest("upsert", request, token)
 }
 
+func (db Database) Remove(collectionName string, criteria interface{}, token string) (error, []byte) {
+	request := StorageRequest{collection: collectionName, criteria: criteria}
+	return db.makeRequest("remove", request, token)
+}
+
 func (db Database) makeRequest(method string, request StorageRequest, token string) (error, []byte) {
 	jsonStr, jsonErr := request.toJson()
 
