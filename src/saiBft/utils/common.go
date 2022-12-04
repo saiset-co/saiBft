@@ -2,7 +2,10 @@ package utils
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/iamthe1whoknocks/bft/models"
 )
@@ -20,6 +23,10 @@ func ExtractResult(input []byte) ([]byte, error) {
 
 }
 
+type IP struct {
+	Query string `json:"query"`
+}
+
 // detect message type from saiP2p data input
 func DetectMsgTypeFromMap(m map[string]interface{}) (string, error) {
 	if _, ok := m["block_number"]; ok {
@@ -31,4 +38,22 @@ func DetectMsgTypeFromMap(m map[string]interface{}) (string, error) {
 	} else {
 		return "", errors.New("unknown msg type")
 	}
+}
+
+func GetOutboundIP() string {
+	req, err := http.Get("http://ip-api.com/json/")
+	if err != nil {
+		return err.Error()
+	}
+	defer req.Body.Close()
+
+	body, err := ioutil.ReadAll(req.Body)
+	if err != nil {
+		return err.Error()
+	}
+
+	var ip IP
+	json.Unmarshal(body, &ip)
+
+	return ip.Query
 }

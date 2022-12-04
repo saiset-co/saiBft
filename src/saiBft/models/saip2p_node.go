@@ -6,9 +6,11 @@ type SaiP2pNode struct {
 }
 
 type SyncRequest struct {
-	Number int `json:"block_number"`
+	From    int    `json:"block_number_from"`
+	To      int    `json:"block_number_to"`
+	Address string `json:"address"`
 }
 
 type SyncResponse struct {
-	Addresses []string `json:"addresses"`
+	Blocks []*BlockConsensusMessage `json:"blocks"`
 }

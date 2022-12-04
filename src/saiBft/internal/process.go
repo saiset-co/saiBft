@@ -36,7 +36,6 @@ func (s *InternalService) Processing() {
 	if !ok {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiBTC address value from config")
 	}
-
 	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
@@ -69,6 +68,30 @@ func (s *InternalService) Processing() {
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
+
+	// initial block consensus waiting
+	initialBCTimeout, ok := s.GlobalService.Configuration["initial_block_consensus_timeout_sec"].(int)
+	if !ok {
+		s.GlobalService.Logger.Fatal("processing - wrong type of inital block consensus timeout  value from config")
+	}
+
+	s.GlobalService.Logger.Debug("initial block consensus initializing", zap.Int("timeout in seconds", initialBCTimeout)) //DEBUG
+	initialTimer := time.NewTimer(time.Duration(initialBCTimeout * int(time.Second)))
+initialBlockConsensus:
+	for {
+		select {
+		case <-s.InitialSignalCh:
+			initialTimer.Stop()
+			s.IsInitialized = true
+			s.GlobalService.Logger.Debug("node was initialized by incoming block consensus msg")
+			break initialBlockConsensus
+		case <-initialTimer.C:
+			initialTimer.Stop()
+			s.IsInitialized = true
+			s.GlobalService.Logger.Debug("initializing timeout expired")
+			break initialBlockConsensus
+		}
+	}
 
 	//TEST transaction &consensus messages
 	s.saveTestTx(saiBtcAddress, storageToken, saiP2Paddress)

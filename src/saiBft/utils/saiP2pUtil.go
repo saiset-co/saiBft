@@ -15,14 +15,15 @@ import (
 )
 
 // send direct get block message to connected nodes
-func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) ([]*models.BlockConsensusMessage, error) {
+func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string, ipAddr string) error {
 	getBlocksRequest := &models.SyncRequest{
-		Number: blockNumber,
+		To:      blockNumber,
+		Address: ipAddr,
 	}
 
 	data, err := json.Marshal(getBlocksRequest)
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - marshal request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - marshal request : %w", err)
 	}
 
 	param := url.Values{}
@@ -31,7 +32,7 @@ func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) (
 
 	postRequest, err := http.NewRequest("POST", saiP2pAddress+"/Send_message_to", strings.NewReader(param.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - create post request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - create post request : %w", err)
 	}
 
 	postRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -42,27 +43,14 @@ func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) (
 
 	resp, err := client.Do(postRequest)
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - send post request : %w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request wrong response status code : %d", resp.StatusCode)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - send post request wrong response status code : %d", resp.StatusCode)
 	}
 
-	blocks := make([]*models.BlockConsensusMessage, 0)
-
-	respData, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request - read body from response : %w", err)
-	}
-
-	defer resp.Body.Close()
-
-	err = json.Unmarshal(respData, &blocks)
-	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request - unmarshal response body : %w", err)
-	}
-	return blocks, nil
+	return nil
 
 }
 
