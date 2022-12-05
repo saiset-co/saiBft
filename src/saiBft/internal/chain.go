@@ -151,6 +151,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 
 	// check if we are not at 7 round in process
 	if s.Round7State {
+		s.GlobalService.Logger.Debug("chain - 7 round state detected")
 		err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - 7 round state - insert block to BlockCandidates collection", zap.Error(err))

@@ -104,13 +104,13 @@ func (s *InternalService) Processing() {
 
 	for {
 	startLoop:
+		s.Round7State = false
 		select {
 		case <-s.GoToStartLoopCh:
 			s.GlobalService.Logger.Debug("signal from chain was got, move to startLoop")
 			goto startLoop
 		default:
 		}
-		s.Round7State = false
 		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
 		time.Sleep(1 * time.Second)                          //DEBUG
