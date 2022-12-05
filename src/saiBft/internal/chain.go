@@ -378,6 +378,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 			return err
 		}
 	}
+
 	return nil
 
 }
