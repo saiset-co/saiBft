@@ -390,9 +390,14 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 	if !ok {
 		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
 	}
-	blacklist, ok := s.GlobalService.Configuration["nodes_blacklist"].([]string)
+	blacklistIface, ok := s.GlobalService.Configuration["nodes_blacklist"].([]interface{})
 	if !ok {
-		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
+		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of nodes_blacklist  value from config", zap.String("detected type", reflect.ValueOf(s.GlobalService.Configuration["nodes_blacklist"]).String()))
+	}
+
+	blacklist := make([]string, 0)
+	for _, b := range blacklistIface {
+		blacklist = append(blacklist, b.(string))
 	}
 
 	connectedNodes, err := utils.GetConnectedNodesAddresses(saiP2Paddress, blacklist)
