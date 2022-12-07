@@ -105,12 +105,6 @@ func (s *InternalService) Processing() {
 	for {
 	startLoop:
 		s.Round7State = false
-		select {
-		case <-s.GoToStartLoopCh:
-			s.GlobalService.Logger.Debug("signal from chain was got, move to startLoop")
-			goto startLoop
-		default:
-		}
 		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
 		time.Sleep(1 * time.Second)                          //DEBUG
@@ -121,6 +115,12 @@ func (s *InternalService) Processing() {
 			continue
 		}
 	checkRound:
+		select {
+		case <-s.GoToStartLoopCh:
+			s.GlobalService.Logger.Debug("signal from chain was got, move to startLoop")
+			goto startLoop
+		default:
+		}
 		s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 		if round == 0 {
 			// get messages with votes = 0
@@ -538,6 +538,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 
 	// check if we have already such block candidate
 	blockCandidate, err := s.getBlockCandidate(newBlock.BlockHash, storageToken)
+
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - sign message", zap.Error(err))
 		return nil, err
