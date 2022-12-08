@@ -262,8 +262,14 @@ func (s *InternalService) getBlockCandidate(blockHash string, storageToken strin
 		return nil, nil
 	}
 
+	data, err := utils.ExtractResult(result)
+	if err != nil {
+		Service.GlobalService.Logger.Error("process - get last block from blockchain - extract data from response", zap.Error(err))
+		return nil, err
+	}
+
 	blockCandidates := make([]models.BlockConsensusMessage, 0)
-	err = json.Unmarshal(result, &blockCandidates)
+	err = json.Unmarshal(data, &blockCandidates)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockCandidateHash = msgBlockHash - unmarshal", zap.Error(err))
 		return nil, err

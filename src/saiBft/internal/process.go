@@ -543,7 +543,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	// check if we have already such block candidate
 	blockCandidate, err := s.getBlockCandidate(newBlock.BlockHash, storageToken)
 	if err != nil {
-		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - sign message", zap.Error(err))
+		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - get block candidate", zap.Error(err))
 		return nil, err
 	}
 
