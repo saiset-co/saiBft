@@ -182,7 +182,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - GetMissedBlocks", zap.Error(err))
 			return err
 		}
-
+		//todo : not ready
 		//	return s.handleBlockCandidate(msg, saiP2pProxyAddress, saiP2pAddress, storageToken)
 	}
 
