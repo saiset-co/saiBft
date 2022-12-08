@@ -252,7 +252,7 @@ func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMe
 // get block candidate with the block hash, add vote if exists
 // insert blockCandidate, if not exists
 func (s *InternalService) getBlockCandidate(blockHash string, storageToken string) (*models.BlockConsensusMessage, error) {
-	err, result := s.Storage.Get("BlockCandidates", bson.M{"hash": blockHash}, bson.M{}, storageToken)
+	err, result := s.Storage.Get("BlockCandidates", bson.M{"block_hash": blockHash}, bson.M{}, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash != msgBlockHash - get block candidate by msg block hash", zap.Error(err))
 		return nil, err
