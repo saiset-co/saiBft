@@ -104,7 +104,6 @@ func (s *InternalService) Processing() {
 
 	for {
 	startLoop:
-		s.Round7State = false
 		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
 		time.Sleep(1 * time.Second)                          //DEBUG
@@ -141,7 +140,7 @@ func (s *InternalService) Processing() {
 					if err != nil {
 						continue
 					}
-					consensusMsg.Messages = append(consensusMsg.Messages, tx.MessageHash)
+					consensusMsg.Messages = append(consensusMsg.Messages, tx.ExecutedHash)
 				}
 			}
 
@@ -194,7 +193,7 @@ func (s *InternalService) Processing() {
 
 				// update votes for each tx message from consensusMsg
 				for _, txMsgHash := range msg.Messages {
-					err, result := s.Storage.Get("MessagesPool", bson.M{"message_hash": txMsgHash}, bson.M{}, storageToken)
+					err, result := s.Storage.Get("MessagesPool", bson.M{"executed_hash": txMsgHash}, bson.M{}, storageToken)
 					if err != nil {
 						s.GlobalService.Logger.Error("process - get msg from consensus msg from storage", zap.Error(err))
 						continue
@@ -224,7 +223,7 @@ func (s *InternalService) Processing() {
 				}
 
 				for _, txMsg := range txMsgs {
-					newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.MessageHash)
+					newConsensusMsg.Messages = append(newConsensusMsg.Messages, txMsg.ExecutedHash)
 				}
 				newConsensusMsg.Round = round + 1
 
@@ -263,8 +262,6 @@ func (s *InternalService) Processing() {
 			if round < maxRoundNumber {
 				goto checkRound
 			} else {
-				s.Round7State = true
-
 				s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 
 				newBlock, err := s.formAndSaveNewBlock(block, saiBtcAddress, storageToken, txMsgs)
@@ -403,13 +400,20 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 		s.GlobalService.Logger.Error("process - ValidateExecuteTransactionMsg - validate tx msg signature", zap.Error(err))
 		return err
 	}
+
 	// dummy vm result values after executing at vm
 	msg.VmResult = true
 	msg.VmResponse = "vmResponse"
 
+	err = msg.GetExecutedHash()
+	if err != nil {
+		s.GlobalService.Logger.Error("process - ValidateExecuteTransactionMsg - get executed hash", zap.Error(err))
+		return err
+	}
+
 	msg.Votes[0]++
 	filter := bson.M{"message_hash": msg.MessageHash}
-	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse}
+	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse, "executed_hash": msg.ExecutedHash}
 	err, _ = s.Storage.Update("MessagesPool", filter, update, storageToken)
 	if err != nil {
 		Service.GlobalService.Logger.Error("process - ValidateExecuteTransactionMsg - update transactions in storage", zap.Error(err))
@@ -538,13 +542,20 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 
 	// check if we have already such block candidate
 	blockCandidate, err := s.getBlockCandidate(newBlock.BlockHash, storageToken)
-
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - sign message", zap.Error(err))
 		return nil, err
 	}
 
-	if blockCandidate != nil {
+	// if there is no such blockCandidate, save block to BlockCandidate collection
+	if blockCandidate == nil {
+		err, _ := s.Storage.Put(BlockCandidatesCol, newBlock, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
+			return nil, err
+		}
+
+	} else { // else, add vote and signature and save to blockchain
 		s.GlobalService.Logger.Debug("found block candidate with formed block hash", zap.String("hash", newBlock.BlockHash))
 		newBlock.Votes = newBlock.Votes + blockCandidate.Votes
 		newBlock.Signatures = append(newBlock.Signatures, blockCandidate.Signatures...)
@@ -554,12 +565,11 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - remove block from block candidates", zap.Error(err))
 			return nil, err
 		}
-	}
-
-	err, _ = s.Storage.Put(blockchainCol, newBlock, storageToken)
-	if err != nil {
-		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put block to blockchain collection", zap.Error(err))
-		return nil, err
+		err, _ = s.Storage.Put(blockchainCol, newBlock, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put block to blockchain collection", zap.Error(err))
+			return nil, err
+		}
 	}
 
 	for _, tx := range txMsgs {
@@ -610,7 +620,7 @@ func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int)
 	// s.GlobalService.Logger.Sugar().Debugf("BEFORE UPDATING ON ROUND : %d, RESULT : %s", round, string(result))
 	/////
 
-	criteria := bson.M{"message_hash": hash}
+	criteria := bson.M{"executed_hash": hash}
 	update := bson.M{"$inc": bson.M{"votes." + strconv.Itoa(round): 1}}
 	err, _ := s.Storage.Upsert("MessagesPool", criteria, update, storageToken)
 	if err != nil {

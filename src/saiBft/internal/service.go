@@ -70,6 +70,5 @@ var Service = &InternalService{
 	InitialSignalCh:      make(chan struct{}),
 	IsInitialized:        false,
 	SkipInitializating:   false,
-	Round7State:          false,
 	GoToStartLoopCh:      make(chan struct{}),
 }

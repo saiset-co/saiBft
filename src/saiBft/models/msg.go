@@ -96,14 +96,15 @@ func (m *Block) GetHash() (string, error) {
 
 // Transaction message
 type TransactionMessage struct {
-	MessageHash string      `json:"message_hash" valid:",required"`
-	Tx          *Tx         `json:"message" valid:",required"`
-	Votes       [7]uint64   `json:"votes"`
-	VmProcessed bool        `json:"vm_processed"`
-	VmResult    bool        `json:"vm_result"`
-	VmResponse  interface{} `json:"vm_response"`
-	BlockHash   string      `json:"block_hash"`
-	BlockNumber int         `json:"block_number"`
+	MessageHash  string      `json:"message_hash" valid:",required"`
+	Tx           *Tx         `json:"message" valid:",required"`
+	Votes        [7]uint64   `json:"votes"`
+	VmProcessed  bool        `json:"vm_processed"`
+	VmResult     bool        `json:"vm_result"`
+	VmResponse   interface{} `json:"vm_response"`
+	BlockHash    string      `json:"block_hash"`
+	BlockNumber  int         `json:"block_number"`
+	ExecutedHash string      `json:"executed_hash"`
 }
 
 // transaction struct
@@ -139,6 +140,22 @@ func (m *Tx) GetHash() (string, error) {
 
 	hash := sha256.Sum256(b)
 	return hex.EncodeToString(hash[:]), nil
+}
+
+// get executed hash of TransactionMessage
+func (m *TransactionMessage) GetExecutedHash() error {
+	b, err := json.Marshal(&TransactionMessage{
+		Tx:         m.Tx,
+		VmResult:   m.VmResult,
+		VmResponse: m.VmResponse,
+	})
+	if err != nil {
+		return err
+	}
+
+	hash := sha256.Sum256(b)
+	m.ExecutedHash = hex.EncodeToString(hash[:])
+	return nil
 }
 
 type GetBlockMsg struct {

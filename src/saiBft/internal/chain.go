@@ -148,19 +148,6 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - validate message and sender", zap.Error(err))
 		return err
 	}
-
-	// check if we are not at 7 round in process
-	if s.Round7State {
-		s.GlobalService.Logger.Debug("chain - 7 round state detected")
-		err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - 7 round state - insert block to BlockCandidates collection", zap.Error(err))
-			return err
-		}
-		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection (7 round state), blockCandidate : %+v\n", msg) // DEBUG
-		return nil
-	}
-
 	// Get Block N
 	err, result := s.Storage.Get(blockchainCol, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
@@ -170,20 +157,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 
 	// if there is no such block - go futher (compare block hash)
 	if len(result) == 2 {
-		err, _ := s.Storage.Put(blockchainCol, msg, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - 7 round state - insert block to BlockCandidates collection", zap.Error(err))
-			return err
-		}
-		s.GoToStartLoopCh <- struct{}{}
-
-		err = s.GetMissedBlocks(msg.Block.Number, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("handleBlockConsensusMsg - GetMissedBlocks", zap.Error(err))
-			return err
-		}
-		//todo : not ready
-		//	return s.handleBlockCandidate(msg, saiP2pProxyAddress, saiP2pAddress, storageToken)
+		return s.handleBlockCandidate(msg, saiP2pProxyAddress, saiP2pAddress, storageToken)
 	}
 
 	s.GlobalService.Logger.Sugar().Debugf("got block consensus : %s\n", result)
@@ -341,29 +315,21 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 
 	// empty get response returns '{}' in storage get method
 	if blockCandidate == nil {
-		if float64(msg.Votes) > math.Ceil(float64(len(s.TrustedValidators))*7/10) {
-			err, _ := s.Storage.Put("Blockchain", msg, storageToken)
-			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to blockchain collection", zap.Error(err))
-				return err
-			}
-			s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockchain collection, blockCandidate : %+v\n", msg) // DEBUG
-			err = s.GetMissedBlocks(msg.Block.Number, storageToken)
-		} else {
-			err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
-			if err != nil {
-				s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
-				return err
-			}
-			s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection, blockCandidate : %+v\n", msg) // DEBUG
-			return nil
+		//float64(msg.Votes) > math.Ceil(float64(len(s.TrustedValidators))*7/10) {
+		err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
+			return err
 		}
-
+		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection, blockCandidate : %+v\n", msg) // DEBUG
+		return nil
 	}
 
 	blockCandidate.Votes++
 	blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
-	if blockCandidate.Votes > msg.Votes {
+
+	requiredVotes := math.Ceil(float64(len(s.TrustedValidators)) * 7 / 10)
+	if float64(blockCandidate.Votes) > requiredVotes {
 		err, _ := s.Storage.Put("Blockchain", msg, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
@@ -378,7 +344,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 			return err
 		}
 	}
-
+	s.GlobalService.Logger.Debug("chain - get block consensus msg - handle block candidate - terminate (less than 70 percent votes got", zap.Int("block candidate votes", blockCandidate.Votes), zap.Float64("required votes", requiredVotes)) // DEBUG
 	return nil
 
 }
