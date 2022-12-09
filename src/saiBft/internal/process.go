@@ -517,7 +517,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	}
 
 	for _, tx := range txMsgs {
-		newBlock.Block.Messages[tx.MessageHash] = tx.Tx
+		newBlock.Block.Messages[tx.ExecutedHash] = tx.Tx
 	}
 
 	blockHash, err := newBlock.Block.GetHash()
