@@ -62,6 +62,8 @@ func (p *Proxy) sync(c *gin.Context) {
 		return
 	}
 
+	p.Logger.Debug("detected msg", zap.Any("msg", msg))
+
 	switch msg.(type) {
 	case *SyncResponse:
 		syncRespMsg := msg.(*SyncResponse)
