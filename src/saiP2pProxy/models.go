@@ -76,3 +76,7 @@ type Tx struct {
 	SenderSignature string `json:"sender_signature" valid:",required"`
 	MessageHash     string `json:"message_hash" valid:",required"`
 }
+
+type IP struct {
+	Query string `json:"query"`
+}

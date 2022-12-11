@@ -163,7 +163,9 @@ func (p *Proxy) sync(c *gin.Context) {
 			}
 		}
 
-		blocksFileLink := fmt.Sprintf("http://%s:%s/files/%s", p.Config.Host, p.Config.Port, filename)
+		ip := GetOutboundIP()
+
+		blocksFileLink := fmt.Sprintf("http://%s:%s/files/%s", ip, p.Config.Port, filename)
 		resp := &SyncResponse{
 			Link:  blocksFileLink,
 			Error: nil,

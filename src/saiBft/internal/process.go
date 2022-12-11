@@ -321,7 +321,7 @@ func (s *InternalService) createInitialBlock(address string) (block *models.Bloc
 			Number:            1,
 			SenderAddress:     s.BTCkeys.Address,
 			PreviousBlockHash: "",
-			Messages:          make(map[string]*models.Tx),
+			Messages:          make(map[string]*models.TransactionMessage),
 		},
 	}
 
@@ -506,12 +506,12 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 			Number:            previousBlock.Block.Number,
 			PreviousBlockHash: previousBlock.BlockHash,
 			SenderAddress:     s.BTCkeys.Address,
-			Messages:          make(map[string]*models.Tx),
+			Messages:          make(map[string]*models.TransactionMessage),
 		},
 	}
 
 	for _, tx := range txMsgs {
-		newBlock.Block.Messages[tx.ExecutedHash] = tx.Tx
+		newBlock.Block.Messages[tx.ExecutedHash] = tx
 	}
 
 	blockHash, err := newBlock.Block.GetHash()

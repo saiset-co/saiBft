@@ -65,12 +65,12 @@ type BlockConsensusMessage struct {
 }
 
 type Block struct {
-	Number            int            `json:"number" valid:",required"`
-	PreviousBlockHash string         `json:"prev_block_hash" valid:",required"`
-	SenderAddress     string         `json:"sender_address" valid:",required"`
-	SenderSignature   string         `json:"sender_signature,omitempty" valid:",required"`
-	BlockHash         string         `json:"block_hash"`
-	Messages          map[string]*Tx `json:"messages"`
+	Number            int                            `json:"number" valid:",required"`
+	PreviousBlockHash string                         `json:"prev_block_hash" valid:",required"`
+	SenderAddress     string                         `json:"sender_address" valid:",required"`
+	SenderSignature   string                         `json:"sender_signature,omitempty" valid:",required"`
+	BlockHash         string                         `json:"block_hash"`
+	Messages          map[string]*TransactionMessage `json:"messages"`
 }
 
 // Validate block consensus message
