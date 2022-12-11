@@ -1,11 +1,11 @@
 proxy_host: "0.0.0.0"
 proxy_port: "8071"
-proxy_endpoint: "send"
 bft_http_host: "sai-bft"
 bft_http_port: "8018"
-p2p_host: "0.0.0.0"
+p2p_host: "sai-p2p"
 p2p_port: "8112"
 blacklist: ["18.218.186.169:9971"]
 storage_url: "http://sai-storage:8801"
 storage_email: "ddd@mial.com"
 storage_password: "fdfsdf"
+storage_token: "12345"

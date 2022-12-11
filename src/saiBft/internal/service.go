@@ -57,7 +57,7 @@ type InternalService struct {
 	MissedBlocksQueue    chan *models.SyncResponse
 	SkipInitializating   bool // first node mode, if true
 	Round7State          bool // if process at the moment at 7 round
-	GoToStartLoopCh      chan struct{}
+	MissedBlocksLinkCh   chan string
 }
 
 // global handler for registering handlers
@@ -70,5 +70,5 @@ var Service = &InternalService{
 	InitialSignalCh:      make(chan struct{}),
 	IsInitialized:        false,
 	SkipInitializating:   false,
-	GoToStartLoopCh:      make(chan struct{}),
+	MissedBlocksLinkCh:   make(chan string),
 }

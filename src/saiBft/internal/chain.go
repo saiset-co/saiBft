@@ -3,6 +3,7 @@ package internal
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"reflect"
 
@@ -208,6 +209,7 @@ func (s *InternalService) sendDirectGetBlockMsg(lastBlockNumber int, saiP2pProxy
 			s.GlobalService.Logger.Error("chain - send direct get block message", zap.String("node", node), zap.Error(err))
 			continue
 		}
+
 		// for _, b := range blocks {
 		// 	tempMap[b]++
 		// }
@@ -294,7 +296,6 @@ func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessa
 // 1. get missed blocks from connected nodes
 // 2. put missed and chosen blocks to blockchain collection
 func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockConsensusMessage, storageToken, saiP2pProxyAddress, saiP2pAddress string) error {
-	//resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number, saiP2pProxyAddress, saiP2pAddress)
 	resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number, saiP2pProxyAddress, saiP2pAddress)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
@@ -319,9 +320,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 		return err
 	}
 
-	// empty get response returns '{}' in storage get method
 	if blockCandidate == nil {
-		//float64(msg.Votes) > math.Ceil(float64(len(s.TrustedValidators))*7/10) {
 		err, _ := s.Storage.Put("BlockCandidates", msg, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
@@ -386,14 +385,16 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 	}
 	syncRequest.Address = s.IpAddress
 
-	//todo : func is not ready yet
 	for _, node := range connectedNodes {
 		err := utils.SendDirectGetBlockMsg(node, syncRequest, saiP2Paddress)
 		if err != nil {
 			s.GlobalService.Logger.Error(err.Error())
 			return err
 		}
-		//missedBlocks <-
+		missedBlocksLink := <-s.MissedBlocksLinkCh
+
+		//todo : func is not ready yet
+		s.GlobalService.Logger.Debug("got link to download blocks", zap.String("address", node), zap.String("link", missedBlocksLink))
 
 	}
 	return nil
@@ -449,11 +450,7 @@ func (s *InternalService) formSyncRequest(blockNumber int, storageToken string) 
 			Address: s.IpAddress,
 		}, nil
 	} else {
-		return &models.SyncRequest{
-			From:    block.Block.Number,
-			To:      blockNumber,
-			Address: s.IpAddress,
-		}, nil
+		return nil, fmt.Errorf("Wrong incoming block number got, incoming block %d. current block : %d", blockNumber, currentBlock)
 	}
 
 }

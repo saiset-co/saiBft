@@ -10,7 +10,3 @@ type SyncRequest struct {
 	To      int    `json:"block_number_to"`
 	Address string `json:"address"`
 }
-
-type SyncResponse struct {
-	Blocks []*BlockConsensusMessage `json:"blocks"`
-}

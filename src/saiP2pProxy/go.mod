@@ -5,6 +5,12 @@ go 1.18
 require github.com/gin-gonic/gin v1.8.1
 
 require (
+	go.uber.org/atomic v1.7.0 // indirect
+	go.uber.org/multierr v1.6.0 // indirect
+)
+
+require (
+	github.com/asaskevich/govalidator v0.0.0-20210307081110-f21760c49a8d
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-contrib/sse v0.1.0 // indirect
 	github.com/go-playground/locales v0.14.0 // indirect
@@ -19,6 +25,7 @@ require (
 	github.com/pelletier/go-toml/v2 v2.0.1 // indirect
 	github.com/ugorji/go/codec v1.2.7 // indirect
 	go.mongodb.org/mongo-driver v1.11.0
+	go.uber.org/zap v1.24.0
 	golang.org/x/crypto v0.0.0-20220622213112-05595931fe9d // indirect
 	golang.org/x/net v0.0.0-20211112202133-69e39bad7dc2 // indirect
 	golang.org/x/sys v0.0.0-20210806184541-e5e7981a1069 // indirect

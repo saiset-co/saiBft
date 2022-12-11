@@ -114,12 +114,6 @@ func (s *InternalService) Processing() {
 			continue
 		}
 	checkRound:
-		select {
-		case <-s.GoToStartLoopCh:
-			s.GlobalService.Logger.Debug("signal from chain was got, move to startLoop")
-			goto startLoop
-		default:
-		}
 		s.GlobalService.Logger.Sugar().Debugf("ROUND = %d", round) //DEBUG
 		if round == 0 {
 			// get messages with votes = 0
