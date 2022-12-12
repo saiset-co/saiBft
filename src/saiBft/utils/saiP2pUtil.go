@@ -2,8 +2,10 @@ package utils
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/url"
 	"strings"
@@ -13,14 +15,10 @@ import (
 )
 
 // send direct get block message to connected nodes
-func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) ([]*models.BlockConsensusMessage, error) {
-	getBlocksRequest := &models.SyncRequest{
-		Number: blockNumber,
-	}
-
-	data, err := json.Marshal(getBlocksRequest)
+func SendDirectGetBlockMsg(node string, req *models.SyncRequest, saiP2pAddress string) error {
+	data, err := json.Marshal(req)
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - marshal request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - marshal request : %w", err)
 	}
 
 	param := url.Values{}
@@ -29,7 +27,7 @@ func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) (
 
 	postRequest, err := http.NewRequest("POST", saiP2pAddress+"/Send_message_to", strings.NewReader(param.Encode()))
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - create post request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - create post request : %w", err)
 	}
 
 	postRequest.Header.Set("Content-Type", "application/x-www-form-urlencoded")
@@ -40,26 +38,84 @@ func SendDirectGetBlockMsg(node string, blockNumber int, saiP2pAddress string) (
 
 	resp, err := client.Do(postRequest)
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request : %w", err)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - send post request : %w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request wrong response status code : %d", resp.StatusCode)
+		return fmt.Errorf("chain - sendDirectGetBlockMsg - send post request wrong response status code : %d", resp.StatusCode)
 	}
 
-	blocks := make([]*models.BlockConsensusMessage, 0)
+	return nil
 
-	respData, err := ioutil.ReadAll(resp.Body)
+}
+
+func GetConnectedNodesAddresses(saiP2Paddress string, blacklist []string) ([]string, error) {
+	client := http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	req, err := http.NewRequest("POST", fmt.Sprintf(saiP2Paddress+"/Get_connections_list_txt"), nil)
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request - read body from response : %w", err)
+		return nil, fmt.Errorf("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request :%w", err)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("chain - handleBlockCandidate - GetBlockchainMissedBlocks - do request request :%w", err)
+	}
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("chain - handleBlockCandidate - GetBlockchainMissedBlocks - read response body :%w", err)
 	}
 
 	defer resp.Body.Close()
 
-	err = json.Unmarshal(respData, &blocks)
+	connectedNodes, err := ParseAddresses(string(body))
 	if err != nil {
-		return nil, fmt.Errorf("chain - sendDirectGetBlockMsg - send post request - unmarshal response body : %w", err)
+		return nil, fmt.Errorf("chain - handleBlockCandidate - GetBlockchainMissedBlocks - parse response body :%w", err)
 	}
-	return blocks, nil
+
+	filteredAddresses := make([]string, 0)
+
+	for _, blNode := range blacklist {
+		for _, address := range connectedNodes {
+			if blNode != address {
+				filteredAddresses = append(filteredAddresses, address)
+			}
+		}
+	}
+	return filteredAddresses, nil
+}
+
+// parse connected addresses from p2p node
+func ParseAddresses(body string) (addresses []string, err error) {
+	s := strings.TrimPrefix(body, "Connected:\n")
+	log.Println("prefix trimmed : ", s)
+
+	addressesSplitted := strings.Split(s, "In Progress Queue:")
+	if len(addressesSplitted) != 2 {
+		log.Println("parse error : wrong data ", addressesSplitted)
+		return nil, errors.New("addresses was not found")
+	}
+
+	log.Println("suffix trimmed : ", addressesSplitted[0])
+
+	addressesWithNumber := strings.Split(addressesSplitted[0], "\n")
+	log.Println("addresses with number : ", addressesWithNumber)
+
+	for _, addressWithNumber := range addressesWithNumber {
+		addressSlice := strings.Split(addressWithNumber, "=")
+		if len(addressSlice) != 2 {
+			log.Println("wrong address : ", addressWithNumber)
+			continue
+		} else {
+			addresses = append(addresses, addressSlice[1])
+		}
+	}
+	if len(addresses) == 0 {
+		return nil, errors.New("addresses was not found")
+	}
+	return addresses, nil
 
 }
