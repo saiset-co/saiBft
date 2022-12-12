@@ -183,21 +183,22 @@ func (p *Proxy) detectMsgType(body io.ReadCloser) (interface{}, error) {
 
 	p.Logger.Debug("detect msg", zap.Any("msg", m))
 
-	if m["block_number_to"] != 0 && m["address"] != "" {
+	switch m["type"] {
+	case SyncRequestType:
 		syncReq := SyncRequest{}
 		err = json.Unmarshal(data, &syncReq)
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal body to syncRequest: %w", err)
 		}
 		return &syncReq, nil
-	} else if m["link"] != "" {
+	case SyncResponseType:
 		syncResp := SyncResponse{}
 		err = json.Unmarshal(data, &syncResp)
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal body to syncResp: %w", err)
 		}
 		return &syncResp, nil
-	} else {
+	default:
 		p.Logger.Error(errWrongMsgType.Error(), zap.Any("msg", m))
 		return nil, errWrongMsgType
 	}

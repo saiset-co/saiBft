@@ -162,8 +162,3 @@ type GetBlockMsg struct {
 	BCMessage        *BlockConsensusMessage `json:"block_consensus"`
 	EqualHashesCount int
 }
-
-type SyncResponse struct {
-	Error error  `json:"error"`
-	Link  string `json:"link"`
-}

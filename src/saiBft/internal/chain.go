@@ -393,7 +393,7 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 		}
 		missedBlocksLink := <-s.MissedBlocksLinkCh
 
-		//todo : func is not ready yet
+		//todo : func is not ready yet, need to get json and filter
 		s.GlobalService.Logger.Debug("got link to download blocks", zap.String("address", node), zap.String("link", missedBlocksLink))
 
 	}
@@ -413,6 +413,7 @@ func (s *InternalService) formSyncRequest(blockNumber int, storageToken string) 
 	//means that we havent blocks in our blockchain collection
 	if len(result) == 2 {
 		return &models.SyncRequest{
+			Type:    models.SyncRequestType,
 			From:    0,
 			To:      blockNumber,
 			Address: s.IpAddress,

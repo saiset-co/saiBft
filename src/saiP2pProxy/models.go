@@ -7,6 +7,11 @@ import (
 	"go.uber.org/zap"
 )
 
+const (
+	SyncRequestType  = "sync_request"
+	SyncResponseType = "sync_response"
+)
+
 type Proxy struct {
 	Config  *Config
 	Storage *utils.Database
@@ -28,12 +33,14 @@ type Config struct {
 }
 
 type SyncRequest struct {
+	Type    string `json:"type"`
 	From    int    `json:"block_number_from"`
 	To      int    `json:"block_number_to"`
 	Address string `json:"address"`
 }
 
 type SyncResponse struct {
+	Type  string `json:"type"`
 	Error error  `json:"error"`
 	Link  string `json:"link"`
 }
