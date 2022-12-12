@@ -140,7 +140,6 @@ var HandleTxFromCli = saiService.HandlerElement{
 		}
 
 		Service.MsgQueue <- transactionMessage.Tx
-		<-Service.MsgQueue
 		return "ok", nil
 	},
 }
