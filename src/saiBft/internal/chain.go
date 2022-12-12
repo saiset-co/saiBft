@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io/ioutil"
 	"math"
+	"net/http"
 	"reflect"
+	"sort"
 
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
@@ -191,55 +194,6 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 	}
 }
 
-//todo : old func
-// Get missed blocks from connected nodes & compare received blocks
-func (s *InternalService) sendDirectGetBlockMsg(lastBlockNumber int, saiP2pProxyAddress string, saiP2pAddress string) (resultBlocks []*models.BlockConsensusMessage, err error) {
-	// temp map for comparing missed blocks, which got from connected saiP2p nodes
-	//tempMap := make(map[*models.BlockConsensusMessage]int)
-
-	addresses, err := utils.GetConnectedNodesAddresses(saiP2pProxyAddress, s.GlobalService.Configuration["nodes_blacklist"].([]string))
-	if err != nil {
-		s.GlobalService.Logger.Error("chain - handleBlockConsensusMsg - sendDirectGetBlockMsg", zap.Error(err))
-		return nil, err
-	}
-
-	for _, node := range addresses {
-		err := utils.SendDirectGetBlockMsg(node, &models.SyncRequest{}, saiP2pAddress)
-		if err != nil {
-			s.GlobalService.Logger.Error("chain - send direct get block message", zap.String("node", node), zap.Error(err))
-			continue
-		}
-
-		// for _, b := range blocks {
-		// 	tempMap[b]++
-		// }
-	}
-	resultBlocks = make([]*models.BlockConsensusMessage, 0)
-
-	// for i := 1; i <= lastBlockNumber; i++ {
-	// 	sliceToSort := make([]*models.BlockConsensusMessage, 0)
-	// 	for k, v := range tempMap {
-	// 		if k.Block.Number == i {
-	// 			sliceToSort = append(sliceToSort, &models.BlockConsensusMessage{
-	// 				Count: v,
-	// 				Block: k.Block,
-	// 			})
-	// 		}
-	// 	}
-	// 	sort.Slice(sliceToSort, func(i, j int) bool {
-	// 		return sliceToSort[i].Count > sliceToSort[j].Count
-	// 	})
-	// 	if len(sliceToSort) == 1 {
-	// 		resultBlocks = append(resultBlocks, sliceToSort[0])
-	// 	} else {
-	// 		if sliceToSort[0].Count != sliceToSort[1].Count {
-	// 			resultBlocks = append(resultBlocks, sliceToSort[0])
-	// 		}
-	// 	}
-	// }
-	return resultBlocks, nil
-}
-
 // validate block consensus message
 func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMessage) bool {
 	for _, validator := range s.TrustedValidators {
@@ -296,7 +250,7 @@ func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessa
 // 1. get missed blocks from connected nodes
 // 2. put missed and chosen blocks to blockchain collection
 func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockConsensusMessage, storageToken, saiP2pProxyAddress, saiP2pAddress string) error {
-	resultBlocks, err := s.sendDirectGetBlockMsg(msg.Block.Number, saiP2pProxyAddress, saiP2pAddress)
+	resultBlocks, err := s.GetMissedBlocks(msg.Block.Number, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
 		return err
@@ -357,7 +311,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 // get blockchain missed blocks
 // send direct get block message to connected nodes
 // get blocks from n to current
-func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) error {
+func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) ([]*models.BlockConsensusMessage, error) {
 	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
@@ -375,29 +329,80 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 	connectedNodes, err := utils.GetConnectedNodesAddresses(saiP2Paddress, blacklist)
 	if err != nil {
 		s.GlobalService.Logger.Error(err.Error())
-		return err
+		return nil, err
 	}
 	// 3 ways to form sync request
 	syncRequest, err := s.formSyncRequest(blockNumber, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error(err.Error())
-		return err
+		return nil, err
 	}
 	syncRequest.Address = s.IpAddress
+
+	// temp map for comparing missed blocks, which got from connected saiP2p nodes
+	tempMap := make(map[*models.BlockConsensusMessage]int)
 
 	for _, node := range connectedNodes {
 		err := utils.SendDirectGetBlockMsg(node, syncRequest, saiP2Paddress)
 		if err != nil {
-			s.GlobalService.Logger.Error(err.Error())
-			return err
+			s.GlobalService.Logger.Error("chain - GetMissedBlocks - sendDirectGetBlockMsg", zap.String("node", node), zap.Error(err))
+			continue
 		}
 		missedBlocksLink := <-s.MissedBlocksLinkCh
 
-		//todo : func is not ready yet, need to get json and filter
-		s.GlobalService.Logger.Debug("got link to download blocks", zap.String("address", node), zap.String("link", missedBlocksLink))
+		s.GlobalService.Logger.Debug("got link for download blocks", zap.String("node", node), zap.String("link", missedBlocksLink))
 
+		resp, err := http.Get(missedBlocksLink)
+		if err != nil {
+			s.GlobalService.Logger.Error("chain - GetMissedBlocks - http.Get", zap.String("node", node), zap.Error(err))
+			continue
+		}
+
+		defer resp.Body.Close()
+
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			s.GlobalService.Logger.Error("chain - GetMissedBlocks - read from body", zap.String("node", node), zap.Error(err))
+			continue
+		}
+
+		blocks := make([]models.BlockConsensusMessage, 0)
+
+		err = json.Unmarshal(data, &blocks)
+		if err != nil {
+			s.GlobalService.Logger.Error("chain - GetMissedBlocks - unmarshal", zap.String("node", node), zap.Error(err))
+			continue
+		}
+
+		for _, b := range blocks {
+			tempMap[&b]++
+		}
 	}
-	return nil
+
+	resultBlocks := make([]*models.BlockConsensusMessage, 0)
+
+	for i := 1; i <= blockNumber; i++ {
+		sliceToSort := make([]*models.BlockConsensusMessage, 0)
+		for k, v := range tempMap {
+			if k.Block.Number == i {
+				sliceToSort = append(sliceToSort, &models.BlockConsensusMessage{
+					Count: v,
+					Block: k.Block,
+				})
+			}
+		}
+		sort.Slice(sliceToSort, func(i, j int) bool {
+			return sliceToSort[i].Count > sliceToSort[j].Count
+		})
+		if len(sliceToSort) == 1 {
+			resultBlocks = append(resultBlocks, sliceToSort[0])
+		} else {
+			if sliceToSort[0].Count != sliceToSort[1].Count {
+				resultBlocks = append(resultBlocks, sliceToSort[0])
+			}
+		}
+	}
+	return resultBlocks, nil
 
 }
 

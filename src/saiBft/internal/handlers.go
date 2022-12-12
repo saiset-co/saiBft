@@ -19,24 +19,23 @@ var GetMissedBlocks = saiService.HandlerElement{
 	Name:        "GetMissedBlocksResponse",
 	Description: "get missed blocks from another node",
 	Function: func(data interface{}) (interface{}, error) {
-		respData, ok := data.([]byte)
+		respData, ok := data.(map[string]interface{})
 		if !ok {
 			err := fmt.Errorf("wrong type of incoming data,incoming data : %s, type : %+v", data, reflect.TypeOf(data))
 			Service.GlobalService.Logger.Error("handlers - GetMissedBlocks - type assertion to GetBlocksRequest", zap.Error(err))
 			return nil, fmt.Errorf("wrong type of incoming data")
 		}
 
-		if len(respData) == 0 {
-			err := errors.New("empty argument provided")
-			Service.GlobalService.Logger.Error("handlers - getBlocks", zap.Error(err))
+		Service.GlobalService.Logger.Debug("handlers - GetMissedBlocksResponse - get sync response", zap.Any("raw response data", respData))
+
+		dataInBytes, err := json.Marshal(respData)
+		if err != nil {
+			Service.GlobalService.Logger.Debug("handlers - GetMissedBlocksResponse - marshal sync response", zap.Error(err))
 			return nil, err
 		}
+		syncResponse := &models.SyncResponse{}
 
-		Service.GlobalService.Logger.Debug("handlers - GetMissedBlocksResponse - get response", zap.String("response data", string(respData)))
-
-		syncResponse := models.SyncResponse{}
-
-		err := json.Unmarshal(respData, &syncResponse)
+		err = json.Unmarshal(dataInBytes, &syncResponse)
 		if err != nil {
 			Service.GlobalService.Logger.Error("handlers - GetMissedBlocksResponse - unmarshal response", zap.Error(err))
 			return nil, err
@@ -44,6 +43,11 @@ var GetMissedBlocks = saiService.HandlerElement{
 
 		if syncResponse.Error != nil {
 			Service.GlobalService.Logger.Error("handlers - GetMissedBlocksResponse - error from syncResponse", zap.Error(syncResponse.Error))
+			return nil, syncResponse.Error
+		}
+
+		if syncResponse.Type != models.SyncResponseType {
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocksResponse - wrong type for msg", zap.String("incoming type", syncResponse.Type))
 			return nil, syncResponse.Error
 		}
 

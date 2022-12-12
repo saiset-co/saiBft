@@ -161,7 +161,7 @@ func (p *Proxy) sendDirectMsg(syncResp *SyncResponse, address string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("send post request wrong response status code : %d", resp.StatusCode)
 	}
-	p.Logger.Debug("direct msg was sent via p2p", zap.String("p2p address", p.Config.P2pHost+p.Config.P2pPort), zap.Int("response status code", resp.StatusCode))
+	p.Logger.Debug("direct msg was sent via p2p", zap.String("p2p address", p.Config.P2pHost+p.Config.P2pPort), zap.Int("response status code", resp.StatusCode), zap.Any("msg", syncResp))
 
 	return nil
 }
@@ -205,13 +205,10 @@ func (p *Proxy) detectMsgType(body io.ReadCloser) (interface{}, error) {
 }
 
 func (p *Proxy) sendSyncResponseMsg(msg *SyncResponse) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("marshal msg : %w", err)
-	}
+	msg.Type = SyncResponseType
 	req := jsonRequestType{
 		Method: "GetMissedBlocksResponse",
-		Data:   data,
+		Data:   msg,
 	}
 
 	sendData, err := json.Marshal(req)

@@ -169,6 +169,7 @@ func (p *Proxy) sync(c *gin.Context) {
 
 		blocksFileLink := fmt.Sprintf("http://%s:%s/files/%s", ip, p.Config.Port, filename)
 		resp := &SyncResponse{
+			Type:  SyncResponseType,
 			Link:  blocksFileLink,
 			Error: nil,
 		}
