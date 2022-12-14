@@ -317,6 +317,8 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 // send direct get block message to connected nodes
 // get blocks from n to current
 func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) ([]*models.BlockConsensusMessage, error) {
+	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - get missed blocks sector entered")
+
 	saiP2Paddress, ok := s.GlobalService.Configuration["saiP2P_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("chain - handleBlockCandidate - GetBlockchainMissedBlocks - create post request- wrong type of saiP2P address value from config")
@@ -336,6 +338,8 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 		s.GlobalService.Logger.Error(err.Error())
 		return nil, err
 	}
+
+	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - got connected nodes", zap.Any("connected nodes", connectedNodes))
 	// 3 ways to form sync request
 	syncRequest, err := s.formSyncRequest(blockNumber, storageToken)
 	if err != nil {
@@ -343,6 +347,8 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 		return nil, err
 	}
 	syncRequest.Address = s.IpAddress
+
+	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - creating sync request", zap.Any("sync request", syncRequest))
 
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
 	tempMap := make(map[*models.BlockConsensusMessage]int)
@@ -407,6 +413,8 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 			}
 		}
 	}
+
+	s.GlobalService.Logger.Debug("chain - block consensus msg - result missed blocks", zap.Any("blocks", resultBlocks))
 	return resultBlocks, nil
 
 }
