@@ -41,7 +41,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 
 	for {
 		data := <-s.MsgQueue
-		s.GlobalService.Logger.Debug("chain - got data", zap.Any("data", data)) // DEBUG
+		//s.GlobalService.Logger.Debug("chain - got data", zap.Any("data", data)) // DEBUG
 		switch data.(type) {
 		case *models.TxFromHandler:
 			// skip if state is not initialized

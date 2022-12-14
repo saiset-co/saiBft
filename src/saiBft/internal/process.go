@@ -494,7 +494,7 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 	// 	return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
 	// }
 
-	s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG                                                       //DEBUG
+	//s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG                                                       //DEBUG
 	return nil
 }
 
@@ -554,7 +554,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 		newBlock.Votes = newBlock.Votes + blockCandidate.Votes
 		newBlock.Signatures = append(newBlock.Signatures, blockCandidate.Signatures...)
 
-		err, _ = s.Storage.Remove(BlockCandidatesCol, bson.M{"hash": newBlock.BlockHash}, storageToken)
+		err, _ = s.Storage.Remove(BlockCandidatesCol, bson.M{"block.block_hash": newBlock.BlockHash}, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - remove block from block candidates", zap.Error(err))
 			return nil, err
