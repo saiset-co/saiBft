@@ -43,12 +43,13 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 		data := <-s.MsgQueue
 		s.GlobalService.Logger.Debug("chain - got data", zap.Any("data", data)) // DEBUG
 		switch data.(type) {
-		case *models.Tx:
+		case *models.TxFromHandler:
 			// skip if state is not initialized
 			if !s.SkipInitializating && !s.IsInitialized {
 				continue
 			}
-			txMsg := data.(*models.Tx)
+			tx := data.(*models.TxFromHandler)
+			txMsg := tx.Tx
 			Service.GlobalService.Logger.Sugar().Debugf("chain - got tx message : %+v", txMsg) //DEBUG
 
 			msg := &models.TransactionMessage{
@@ -84,6 +85,9 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			}
 
 			Service.GlobalService.Logger.Sugar().Debugf("TransactionMsg was saved in MessagesPool storage, msg : %+v\n", msg)
+			if tx.IsFromCli {
+				s.TxHandlerSyncCh <- struct{}{}
+			}
 
 		case *models.ConsensusMessage:
 			// skip if state is not initialized

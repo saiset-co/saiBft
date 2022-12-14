@@ -162,3 +162,8 @@ type GetBlockMsg struct {
 	BCMessage        *BlockConsensusMessage `json:"block_consensus"`
 	EqualHashesCount int
 }
+
+type TxFromHandler struct {
+	Tx        *Tx
+	IsFromCli bool
+}

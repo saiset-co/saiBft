@@ -58,6 +58,7 @@ type InternalService struct {
 	SkipInitializating   bool // first node mode, if true
 	Round7State          bool // if process at the moment at 7 round
 	MissedBlocksLinkCh   chan string
+	TxHandlerSyncCh      chan struct{}
 }
 
 // global handler for registering handlers
@@ -71,4 +72,5 @@ var Service = &InternalService{
 	IsInitialized:        false,
 	SkipInitializating:   false,
 	MissedBlocksLinkCh:   make(chan string),
+	TxHandlerSyncCh:      make(chan struct{}),
 }

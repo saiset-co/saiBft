@@ -63,9 +63,14 @@ var HandleTxFromCli = saiService.HandlerElement{
 	Description: "handle tx message",
 	Function: func(data interface{}) (interface{}, error) {
 		argsStr := make([]string, 0)
+		txStruct := models.TxFromHandler{
+			IsFromCli: false,
+		}
 		switch args := data.(type) {
 		case []string:
 			argsStr = args
+			Service.GlobalService.Logger.Debug("got message from cli", zap.Strings("data", argsStr))
+			txStruct.IsFromCli = true
 		case []interface{}:
 			for _, iface := range args {
 				strArg, ok := iface.(string)
@@ -74,6 +79,7 @@ var HandleTxFromCli = saiService.HandlerElement{
 				}
 				argsStr = append(argsStr, strArg)
 			}
+			Service.GlobalService.Logger.Debug("got message from http", zap.Strings("data", argsStr))
 		default:
 			return nil, fmt.Errorf("wrong type for args in cli tx method, current type :%s", reflect.TypeOf(data))
 		}
@@ -139,7 +145,14 @@ var HandleTxFromCli = saiService.HandlerElement{
 			Service.GlobalService.Logger.Error("listenFromSaiP2P  - handle tx msg - broadcast tx", zap.Error(err))
 		}
 
-		Service.MsgQueue <- transactionMessage.Tx
+		txStruct.Tx = transactionMessage.Tx
+
+		Service.MsgQueue <- &txStruct
+
+		if txStruct.IsFromCli {
+			<-Service.TxHandlerSyncCh
+		}
+
 		return "ok", nil
 	},
 }
