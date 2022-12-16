@@ -129,15 +129,16 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 			}
 
 			if !s.IsInitialized {
-				err, _ = s.Storage.Put(blockchainCol, msg, storageToken)
-				if err != nil {
-					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - put to storage", zap.Error(err))
-					continue
-				}
-
+				//todo : wrong order : put -> send signal to start process -> sync
 				err := s.updateBlockchain(msg, storageToken, saiP2pProxyAddress, saiP2Paddress)
 				if err != nil {
 					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - update blockchain", zap.Error(err))
+					continue
+				}
+
+				err, _ = s.Storage.Put(blockchainCol, msg, storageToken)
+				if err != nil {
+					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - put to storage", zap.Error(err))
 					continue
 				}
 				s.InitialSignalCh <- struct{}{}
@@ -347,6 +348,7 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 
 	if len(connectedNodes) == 0 {
 		s.GlobalService.Logger.Debug("no connected nodes found", zap.String("address", s.IpAddress))
+		return nil, errNoConnectedNodesFound
 	}
 
 	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - got connected nodes", zap.Any("connected nodes", connectedNodes))
@@ -465,6 +467,7 @@ func (s *InternalService) formSyncRequest(blockNumber int, storageToken string) 
 	// we need only 1 exact block
 	if currentBlock == blockNumber {
 		return &models.SyncRequest{
+			Type:    models.SyncRequestType,
 			From:    blockNumber,
 			To:      blockNumber,
 			Address: s.IpAddress,
@@ -474,6 +477,7 @@ func (s *InternalService) formSyncRequest(blockNumber int, storageToken string) 
 	// node is lagging behind, requesting missing blocks
 	if currentBlock < blockNumber {
 		return &models.SyncRequest{
+			Type:    models.SyncRequestType,
 			From:    currentBlock,
 			To:      blockNumber,
 			Address: s.IpAddress,
