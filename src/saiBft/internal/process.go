@@ -295,7 +295,7 @@ func (s *InternalService) getLastBlockFromBlockChain(storageToken string, saiBtc
 		}
 		block := blocks[0]
 		block.Block.Number++
-		s.GlobalService.Logger.Sugar().Debugf("Got last block from blockchain collection : %+v\n", block) //DEBUG
+		s.GlobalService.Logger.Debug("Got last block from blockchain collection", zap.Int("block number", block.Block.Number)) //DEBUG
 
 		return block, nil
 	}

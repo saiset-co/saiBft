@@ -111,7 +111,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				Service.GlobalService.Logger.Error("listenFromSaiP2P - consensusMsg - put to storage", zap.Error(err))
 				continue
 			}
-			Service.GlobalService.Logger.Sugar().Debugf("ConsensusMsg was saved in ConsensusPool storage, msg : %+v\n", msg)
+			//			Service.GlobalService.Logger.Sugar().Debugf("ConsensusMsg was saved in ConsensusPool storage, msg : %+v\n", msg)
 			continue
 
 		case *models.BlockConsensusMessage:
@@ -343,6 +343,10 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 	if err != nil {
 		s.GlobalService.Logger.Error(err.Error())
 		return nil, err
+	}
+
+	if len(connectedNodes) == 0 {
+		s.GlobalService.Logger.Debug("no connected nodes found", zap.String("address", s.IpAddress))
 	}
 
 	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - got connected nodes", zap.Any("connected nodes", connectedNodes))
