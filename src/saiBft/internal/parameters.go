@@ -44,7 +44,7 @@ func (s *InternalService) setValidators(storageToken string) error {
 		return err
 	}
 
-	params := models.Parameters{}
+	params := make([]*models.Parameters, 0)
 
 	err = json.Unmarshal(data, &params)
 	if err != nil {
@@ -52,8 +52,10 @@ func (s *InternalService) setValidators(storageToken string) error {
 		return err
 	}
 
+	param := params[0]
+
 	// validators was not found from parameters col, check config and update
-	if params.Validators == nil {
+	if param.Validators == nil {
 		validators, err := s.getValidatorsFromConfig()
 		if err != nil {
 			s.GlobalService.Logger.Debug("process - setValidator - get parameters from config", zap.Error(err))
@@ -69,7 +71,7 @@ func (s *InternalService) setValidators(storageToken string) error {
 		return nil
 	}
 
-	s.Validators = params.Validators
+	s.Validators = param.Validators
 
 	return nil
 }
