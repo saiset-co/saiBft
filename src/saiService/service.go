@@ -147,14 +147,14 @@ func (s *Service) StartServices() {
 		go s.StartWS()
 	}
 
-	s.StartTasks()
+	s.StartTasks(mode)
 
 	log.Printf("%s has been started!", s.Name)
 
 	s.StartSocket()
 }
 
-func (s *Service) StartTasks() {
+func (s *Service) StartTasks(mode string) {
 	for _, task := range s.Tasks {
 		go task()
 	}

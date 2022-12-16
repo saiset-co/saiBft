@@ -45,7 +45,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 		switch data.(type) {
 		case *models.TxFromHandler:
 			// skip if state is not initialized
-			if !s.SkipInitializating && !s.IsInitialized {
+			if !s.IsInitialized {
 				continue
 			}
 			tx := data.(*models.TxFromHandler)
@@ -91,7 +91,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 
 		case *models.ConsensusMessage:
 			// skip if state is not initialized
-			if !s.SkipInitializating && !s.IsInitialized {
+			if !s.IsInitialized {
 				continue
 			}
 			msg := data.(*models.ConsensusMessage)
@@ -128,10 +128,17 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				continue
 			}
 
-			if !s.SkipInitializating && !s.IsInitialized {
+			if !s.IsInitialized {
 				err, _ = s.Storage.Put(blockchainCol, msg, storageToken)
 				if err != nil {
 					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - put to storage", zap.Error(err))
+					continue
+				}
+
+				err := s.updateBlockchain(msg, storageToken, saiP2pProxyAddress, saiP2Paddress)
+				if err != nil {
+					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - update blockchain", zap.Error(err))
+					continue
 				}
 				s.InitialSignalCh <- struct{}{}
 				continue
@@ -200,7 +207,7 @@ func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddr
 
 // validate block consensus message
 func (s *InternalService) validateBlockConsensusMsg(msg *models.BlockConsensusMessage) bool {
-	for _, validator := range s.TrustedValidators {
+	for _, validator := range s.Validators {
 		if validator == msg.Block.SenderAddress {
 			return true
 		}
@@ -253,7 +260,7 @@ func (s *InternalService) addVotesToBlock(block, msg *models.BlockConsensusMessa
 // update blockchain
 // 1. get missed blocks from connected nodes
 // 2. put missed and chosen blocks to blockchain collection
-func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockConsensusMessage, storageToken, saiP2pProxyAddress, saiP2pAddress string) error {
+func (s *InternalService) updateBlockchain(msg *models.BlockConsensusMessage, storageToken, saiP2pProxyAddress, saiP2pAddress string) error {
 	resultBlocks, err := s.GetMissedBlocks(msg.Block.Number, storageToken)
 	if err != nil {
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
@@ -264,7 +271,6 @@ func (s *InternalService) updateBlockchain(msg, blockCandidate *models.BlockCons
 	if err != nil {
 		return err
 	}
-	s.GlobalService.Logger.Sugar().Debugf("blockCandidate was saved in blockchain collection, msg : %+v\n", blockCandidate)
 	return nil
 }
 
@@ -291,7 +297,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 	blockCandidate.Votes++
 	blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
 
-	requiredVotes := math.Ceil(float64(len(s.TrustedValidators)) * 7 / 10)
+	requiredVotes := math.Ceil(float64(len(s.Validators)) * 7 / 10)
 	if float64(blockCandidate.Votes) > requiredVotes {
 		s.GlobalService.Logger.Debug("chain - handle block consensus - handle - block candidate - sync block")
 		err, _ := s.Storage.Put("Blockchain", msg, storageToken)
@@ -302,7 +308,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 
 		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockchain collection, blockCandidate : %+v\n", msg) // DEBUG
 
-		err = s.updateBlockchain(msg, blockCandidate, saiP2pProxyAddress, storageToken, saiP2pAddress)
+		err = s.updateBlockchain(msg, saiP2pProxyAddress, storageToken, saiP2pAddress)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - update blockchain", zap.Error(err))
 			return err
