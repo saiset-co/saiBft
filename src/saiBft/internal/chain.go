@@ -291,8 +291,6 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
 			return err
 		}
-		s.GlobalService.Logger.Sugar().Debugf("block candidate was inserted to blockCandidates collection, blockCandidate : %+v\n", msg) // DEBUG
-		return nil
 	}
 
 	blockCandidate.Votes++
