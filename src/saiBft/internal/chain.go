@@ -297,7 +297,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 	blockCandidate.Signatures = append(blockCandidate.Signatures, msg.Block.SenderSignature)
 
 	requiredVotes := math.Ceil(float64(len(s.Validators)) * 7 / 10)
-	if float64(blockCandidate.Votes) > requiredVotes {
+	if float64(blockCandidate.Votes) >= requiredVotes {
 		s.GlobalService.Logger.Debug("chain - handle block consensus - handle - block candidate - sync block")
 		err, _ := s.Storage.Put("Blockchain", msg, storageToken)
 		if err != nil {

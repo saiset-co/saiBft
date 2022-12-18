@@ -507,10 +507,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 		},
 	}
 
-	for _, tx := range txMsgs {
-		newBlock.Block.Messages[tx.ExecutedHash] = tx
-	}
-
 	blockHash, err := newBlock.Block.GetHash()
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - count hash of new block", zap.Error(err))
@@ -530,8 +526,23 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.Block.SenderSignature = btcResp.Signature
 	newBlock.Signatures = append(newBlock.Signatures, btcResp.Signature)
 
+	for _, tx := range txMsgs {
+		err, _ := s.Storage.Update("MessagesPool", bson.M{"executed_hash": tx.ExecutedHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - update tx blockhash", zap.Error(err))
+			return nil, err
+		}
+		tx.BlockHash = newBlock.BlockHash
+		tx.BlockNumber = newBlock.Block.Number
+	}
+
+	for _, tx := range txMsgs {
+		newBlock.Block.Messages[tx.ExecutedHash] = tx
+	}
+
 	requiredVotes := math.Ceil(float64(len(s.Validators)) * 7 / 10)
-	if float64(newBlock.Votes) > requiredVotes {
+
+	if float64(newBlock.Votes) >= requiredVotes {
 		err, _ := s.Storage.Put("Blockchain", newBlock, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
@@ -547,6 +558,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 
 		// if there is no such blockCandidate, save block to BlockCandidate collection
 		if blockCandidate == nil {
+			s.GlobalService.Logger.Debug("process - from new block - blockcandidate not found")
 			err, _ := s.Storage.Put(BlockCandidatesCol, newBlock, storageToken)
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
@@ -557,7 +569,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 			newBlock.Votes = newBlock.Votes + blockCandidate.Votes
 			newBlock.Signatures = append(newBlock.Signatures, blockCandidate.Signatures...)
 
-			if float64(newBlock.Votes) > requiredVotes {
+			if float64(newBlock.Votes) >= requiredVotes {
 				err, _ = s.Storage.Put(blockchainCol, newBlock, storageToken)
 				if err != nil {
 					s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put block to blockchain collection", zap.Error(err))
@@ -568,14 +580,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 			if err != nil {
 				s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
 				return nil, err
-			}
-
-			for _, tx := range txMsgs {
-				err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
-				if err != nil {
-					s.GlobalService.Logger.Error("process - round == 7 - form and save new block - update tx blockhash", zap.Error(err))
-					return nil, err
-				}
 			}
 		}
 	}
