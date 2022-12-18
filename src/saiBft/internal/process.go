@@ -513,7 +513,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.Block.BlockHash = blockHash
 
 	btcResp, err := utils.SignMessage(newBlock, saiBTCaddress, s.BTCkeys.Private)
-
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - sign message", zap.Error(err))
 		return nil, err
