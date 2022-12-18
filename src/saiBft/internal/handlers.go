@@ -30,7 +30,7 @@ var GetMissedBlocks = saiService.HandlerElement{
 
 		dataInBytes, err := json.Marshal(respData)
 		if err != nil {
-			Service.GlobalService.Logger.Debug("handlers - GetMissedBlocksResponse - marshal sync response", zap.Error(err))
+			Service.GlobalService.Logger.Error("handlers - GetMissedBlocksResponse - marshal sync response", zap.Error(err))
 			return nil, err
 		}
 		syncResponse := &models.SyncResponse{}

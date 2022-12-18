@@ -400,6 +400,12 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 		}
 	}
 
+	if len(tempMap) == 0 {
+		return nil, errNoBlocks
+	}
+
+	s.GlobalService.Logger.Debug("chain - handleBlockCandidate - get missed blocks", zap.Any("result blocks", tempMap))
+
 	resultBlocks := make([]*models.BlockConsensusMessage, 0)
 
 	for i := 1; i <= blockNumber; i++ {
