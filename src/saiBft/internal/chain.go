@@ -8,7 +8,6 @@ import (
 	"math"
 	"net/http"
 	"reflect"
-	"sort"
 
 	"github.com/iamthe1whoknocks/bft/models"
 	"github.com/iamthe1whoknocks/bft/utils"
@@ -141,6 +140,7 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - put to storage", zap.Error(err))
 					continue
 				}
+				s.IsInitialized = true
 				s.InitialSignalCh <- struct{}{}
 				continue
 			}
@@ -267,10 +267,12 @@ func (s *InternalService) updateBlockchain(msg *models.BlockConsensusMessage, st
 		s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - sendDirectGetBlockMessage", zap.Error(err))
 		return err
 	}
-
-	err, _ = s.Storage.Put(blockchainCol, resultBlocks, storageToken)
-	if err != nil {
-		return err
+	s.GlobalService.Logger.Debug("chain - block consensus msg - update blockchain - blocks to put", zap.Any("blocks", resultBlocks))
+	for _, block := range resultBlocks {
+		err, _ = s.Storage.Put(blockchainCol, block, storageToken)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -291,6 +293,7 @@ func (s *InternalService) handleBlockCandidate(msg *models.BlockConsensusMessage
 			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
 			return err
 		}
+		return nil
 	}
 
 	blockCandidate.Votes++
@@ -361,7 +364,10 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 	s.GlobalService.Logger.Debug("chain - handle blockConsensusMsg - handle block candidate - creating sync request", zap.Any("sync request", syncRequest))
 
 	// temp map for comparing missed blocks, which got from connected saiP2p nodes
-	tempMap := make(map[*models.BlockConsensusMessage]int)
+	// [block.Number]*BlockConsensus
+	tempMap := make(map[int]*models.BlockConsensusMessage)
+
+	resultBlocks := make([]*models.BlockConsensusMessage, 0)
 
 	for _, node := range connectedNodes {
 		err := utils.SendDirectGetBlockMsg(node, syncRequest, saiP2Paddress)
@@ -395,42 +401,59 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 			continue
 		}
 
-		for _, b := range blocks {
-			tempMap[&b]++
-		}
-	}
+		s.GlobalService.Logger.Debug("chain - get missed blocks - got blocks", zap.Any("blocks", blocks), zap.String("link", missedBlocksLink))
 
-	if len(tempMap) == 0 {
-		return nil, errNoBlocks
-	}
-
-	s.GlobalService.Logger.Debug("chain - handleBlockCandidate - get missed blocks", zap.Any("result blocks", tempMap))
-
-	resultBlocks := make([]*models.BlockConsensusMessage, 0)
-
-	for i := 1; i <= blockNumber; i++ {
-		sliceToSort := make([]*models.BlockConsensusMessage, 0)
-		for k, v := range tempMap {
-			if k.Block.Number == i {
-				sliceToSort = append(sliceToSort, &models.BlockConsensusMessage{
-					Count: v,
-					Block: k.Block,
-				})
+		for i, b := range blocks {
+			s.GlobalService.Logger.Debug("chain - get missed blocks - range for blocks to put in map", zap.Int("block_number", b.Block.Number), zap.String("hash", b.BlockHash))
+			block, ok := tempMap[b.Block.Number]
+			if ok {
+				if block.Votes < b.Votes {
+					tempMap[b.Block.Number] = &blocks[i]
+				}
+			} else {
+				tempMap[b.Block.Number] = &blocks[i]
 			}
 		}
-		sort.Slice(sliceToSort, func(i, j int) bool {
-			return sliceToSort[i].Count > sliceToSort[j].Count
-		})
-		if len(sliceToSort) == 1 {
-			resultBlocks = append(resultBlocks, sliceToSort[0])
-		} else {
-			if sliceToSort[0].Count != sliceToSort[1].Count {
-				resultBlocks = append(resultBlocks, sliceToSort[0])
-			}
-		}
+
 	}
 
-	s.GlobalService.Logger.Debug("chain - block consensus msg - result missed blocks", zap.Any("blocks", resultBlocks))
+	s.GlobalService.Logger.Sugar().Debugf("chain - get missed blocks - blocks in map %+v", tempMap)
+
+	for _, v := range tempMap {
+		resultBlocks = append(resultBlocks, v)
+	}
+
+	// old function
+	// if len(tempMap) == 0 {
+	// 	return nil, errNoBlocks
+	// }
+	// s.GlobalService.Logger.Debug("chain - handleBlockCandidate - temp map with blocks", zap.Int("temp map length", len(tempMap)))
+	// s.GlobalService.Logger.Sugar().Debugf("chain - handleBlockCandidate - temp map with blocks :%+v", tempMap)
+
+	// resultBlocks := make([]*models.BlockConsensusMessage, 0)
+
+	// for i := 1; i <= blockNumber; i++ {
+	// 	sliceToSort := make([]*models.BlockConsensusMessage, 0)
+	// 	for k, v := range tempMap {
+	// 		if k.Block.Number == i {
+	// 			sliceToSort = append(sliceToSort, &models.BlockConsensusMessage{
+	// 				Count: v,
+	// 				Block: k.Block,
+	// 			})
+	// 		}
+	// 	}
+	// 	sort.Slice(sliceToSort, func(i, j int) bool {
+	// 		return sliceToSort[i].Count > sliceToSort[j].Count
+	// 	})
+	// 	if len(sliceToSort) == 1 {
+	// 		resultBlocks = append(resultBlocks, sliceToSort[0])
+	// 	} else {
+	// 		if sliceToSort[0].Count != sliceToSort[1].Count {
+	// 			resultBlocks = append(resultBlocks, sliceToSort[0])
+	// 		}
+	// 	}
+	// }
+
 	return resultBlocks, nil
 
 }
