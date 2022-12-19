@@ -401,10 +401,8 @@ func (s *InternalService) GetMissedBlocks(blockNumber int, storageToken string) 
 			continue
 		}
 
-		s.GlobalService.Logger.Debug("chain - get missed blocks - got blocks", zap.Any("blocks", blocks), zap.String("link", missedBlocksLink))
-
 		for i, b := range blocks {
-			s.GlobalService.Logger.Debug("chain - get missed blocks - range for blocks to put in map", zap.Int("block_number", b.Block.Number), zap.String("hash", b.BlockHash))
+			//			s.GlobalService.Logger.Debug("chain - get missed blocks - range for blocks to put in map", zap.Int("block_number", b.Block.Number), zap.String("hash", b.BlockHash))
 			block, ok := tempMap[b.Block.Number]
 			if ok {
 				if block.Votes < b.Votes {
