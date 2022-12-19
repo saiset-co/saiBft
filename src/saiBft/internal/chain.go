@@ -127,14 +127,14 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				continue
 			}
 
-			if !s.IsInitialized {
-				//todo : wrong order : put -> send signal to start process -> sync
-				err := s.updateBlockchain(msg, storageToken, saiP2pProxyAddress, saiP2Paddress)
-				if err != nil {
-					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - update blockchain", zap.Error(err))
-					continue
-				}
+			isValid := s.validateBlockConsensusMsg(msg)
+			if !isValid {
+				err := errors.New("Provided BlockConsensusMsg is invalid")
+				s.GlobalService.Logger.Error("handleBlockConsensusMsg - validate message and sender", zap.Error(err))
+				continue
+			}
 
+			if !s.IsInitialized {
 				err, _ = s.Storage.Put(blockchainCol, msg, storageToken)
 				if err != nil {
 					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - put to storage", zap.Error(err))
@@ -142,6 +142,13 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 				}
 				s.IsInitialized = true
 				s.InitialSignalCh <- struct{}{}
+
+				err := s.updateBlockchain(msg, storageToken, saiP2pProxyAddress, saiP2Paddress)
+				if err != nil {
+					Service.GlobalService.Logger.Error("listenFromSaiP2P - initial block consensus msg - update blockchain", zap.Error(err))
+					continue
+				}
+
 				continue
 			}
 
@@ -158,12 +165,6 @@ func (s *InternalService) listenFromSaiP2P(saiBTCaddress string) {
 
 // handle BlockConsensusMsg
 func (s *InternalService) handleBlockConsensusMsg(saiBTCaddress, saiP2pProxyAddress, storageToken string, msg *models.BlockConsensusMessage, saiP2pAddress string) error {
-	isValid := s.validateBlockConsensusMsg(msg)
-	if !isValid {
-		err := errors.New("Provided BlockConsensusMsg is invalid")
-		s.GlobalService.Logger.Error("handleBlockConsensusMsg - validate message and sender", zap.Error(err))
-		return err
-	}
 	// Get Block N
 	err, result := s.Storage.Get(blockchainCol, bson.M{"block.number": msg.Block.Number}, bson.M{}, storageToken)
 	if err != nil {
