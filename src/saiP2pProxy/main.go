@@ -36,7 +36,7 @@ func main() {
 
 	r.POST("/send", proxy.Handler)
 	r.GET("/check", proxy.check)
-	r.GET("/sync", proxy.sync)
+	r.POST("/sync", proxy.sync)
 	r.Static("/files", "./files")
 
 	r.Run(fmt.Sprintf("%s:%s", config.Host, config.Port))

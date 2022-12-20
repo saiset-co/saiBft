@@ -163,7 +163,14 @@ type GetBlockMsg struct {
 	EqualHashesCount int
 }
 
-type SyncResponse struct {
-	Error error  `json:"error"`
-	Link  string `json:"link"`
+// struct to handle tx from handler
+type TxFromHandler struct {
+	Tx        *Tx
+	IsFromCli bool
+}
+
+// Parameters of blockchain
+type Parameters struct {
+	Validators     []string `json:"validators"`
+	IsBoorstrapped bool     `json:"is_bootstrapped"`
 }

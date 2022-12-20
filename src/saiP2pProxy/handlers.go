@@ -62,6 +62,8 @@ func (p *Proxy) sync(c *gin.Context) {
 		return
 	}
 
+	p.Logger.Debug("detected msg", zap.Any("msg", msg))
+
 	switch msg.(type) {
 	case *SyncResponse:
 		syncRespMsg := msg.(*SyncResponse)
@@ -167,6 +169,7 @@ func (p *Proxy) sync(c *gin.Context) {
 
 		blocksFileLink := fmt.Sprintf("http://%s:%s/files/%s", ip, p.Config.Port, filename)
 		resp := &SyncResponse{
+			Type:  SyncResponseType,
 			Link:  blocksFileLink,
 			Error: nil,
 		}

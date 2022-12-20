@@ -20,21 +20,13 @@ func Init(svc *saiService.Service) {
 		svc.Logger.Fatal("main - init - open btc keys", zap.Error(err))
 	}
 	Service.BTCkeys = btckeys
+	svc.Logger.Sugar().Debugf("btc keys : %+v\n", Service.BTCkeys) //DEBUG
 
 	Service.IpAddress = utils.GetOutboundIP()
 	if Service.IpAddress == "" {
 		svc.Logger.Fatal("Cannot detect outbound IP address of node")
 	}
-
 	svc.Logger.Debug("node address : ", zap.String("ip address", Service.IpAddress)) //DEBUG
-	svc.Logger.Sugar().Debugf("btc keys : %+v\n", Service.BTCkeys)                   //DEBUG
-
-	skipInitializating, ok := Service.GlobalService.Configuration["skip_initializating"].(bool)
-	if !ok {
-		svc.Logger.Fatal("handlers - processing - wrong type of skip initializating value from config")
-	}
-
-	Service.SkipInitializating = skipInitializating
 
 	Service.Handler[GetMissedBlocks.Name] = GetMissedBlocks
 	Service.Handler[HandleTxFromCli.Name] = HandleTxFromCli
@@ -45,7 +37,7 @@ func Init(svc *saiService.Service) {
 type InternalService struct {
 	Handler              saiService.Handler  // handlers to define in this specified microservice
 	GlobalService        *saiService.Service // saiService reference
-	TrustedValidators    []string
+	Validators           []string
 	Mutex                *sync.RWMutex
 	ConnectedSaiP2pNodes map[string]*models.SaiP2pNode
 	BTCkeys              *models.BtcKeys
@@ -55,9 +47,10 @@ type InternalService struct {
 	Storage              utils.Database
 	IpAddress            string // outbound ip address
 	MissedBlocksQueue    chan *models.SyncResponse
-	SkipInitializating   bool // first node mode, if true
-	Round7State          bool // if process at the moment at 7 round
-	MissedBlocksLinkCh   chan string
+	Round7State          bool          // if process at the moment at 7 round
+	MissedBlocksLinkCh   chan string   //chan to get link from p2pProxy handler
+	TxHandlerSyncCh      chan struct{} // chan to handle tx via http/cli
+	IsValidator          bool          //is node a validator
 }
 
 // global handler for registering handlers
@@ -69,6 +62,6 @@ var Service = &InternalService{
 	MissedBlocksQueue:    make(chan *models.SyncResponse),
 	InitialSignalCh:      make(chan struct{}),
 	IsInitialized:        false,
-	SkipInitializating:   false,
 	MissedBlocksLinkCh:   make(chan string),
+	TxHandlerSyncCh:      make(chan struct{}),
 }

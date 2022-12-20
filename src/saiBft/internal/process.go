@@ -29,6 +29,7 @@ const (
 	MessagesPoolCol    = "MessagesPool"
 	ConsensusPoolCol   = "ConsensusPool"
 	BlockCandidatesCol = "BlockCandidates"
+	ParametersCol      = "Parameters"
 	maxRoundNumber     = 7
 	btcKeyFile         = "btc_keys.json"
 )
@@ -44,7 +45,7 @@ func (s *InternalService) Processing() {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
 	}
 
-	saiVM1address, ok := s.GlobalService.Configuration["saiVM1_Address"].(string)
+	saiVM1address, ok := s.GlobalService.Configuration["saiVM1_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiVM1 address value from config")
 	}
@@ -55,49 +56,38 @@ func (s *InternalService) Processing() {
 	// btcKeys2, _ := s.getBTCkeys("btc_keys2.json", saiBtcAddress)
 	// btcKeys3, _ := s.getBTCkeys("btc_keys1.json", saiBtcAddress)
 	//s.TrustedValidators = append(s.TrustedValidators, s.BTCkeys.Address)
-	//
-	//s.GlobalService.Logger.Sugar().Debugf("btc keys : %+v\n", s.BTCkeys) //DEBUG
-	//
+
 	storageToken, ok := s.GlobalService.Configuration["storage_token"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("handlers - processing - wrong type of storage token value from config")
 	}
 
-	// get trusted validators from config
-	trustedValidatorsInterface, ok := s.GlobalService.Configuration["trusted_validators"].([]interface{})
-	if !ok {
-		s.GlobalService.Logger.Fatal("handlers - processing - wrong type of trusted_validators value from config")
+	err := s.setValidators(storageToken)
+	if err != nil {
+		s.GlobalService.Logger.Fatal("process - check validator state", zap.Error(err))
 	}
 
-	for _, validator := range trustedValidatorsInterface {
-		s.TrustedValidators = append(s.TrustedValidators, validator.(string))
+	s.GlobalService.Logger.Debug("get validators", zap.Strings("validators", s.Validators)) //DEBUG
+
+	var isValidator bool
+
+	for _, validator := range s.Validators {
+		if validator == s.BTCkeys.Address {
+			s.IsInitialized = true
+			isValidator = true
+		}
 	}
 
-	s.GlobalService.Logger.Sugar().Debugf("got trusted validators : %v", s.TrustedValidators) //DEBUG
-
-	s.GlobalService.Logger.Debug("Start node mode", zap.Bool("skip initializating", s.SkipInitializating)) //DEBUG
+	s.GlobalService.Logger.Debug("node mode", zap.Bool("is_validator", isValidator)) //DEBUG
 
 	// initial block consensus waiting
-	if !s.SkipInitializating {
-		initialBCTimeout, ok := s.GlobalService.Configuration["initial_block_consensus_timeout_sec"].(int)
-		if !ok {
-			s.GlobalService.Logger.Fatal("processing - wrong type of inital block consensus timeout  value from config")
-		}
-
-		s.GlobalService.Logger.Debug("initial block consensus initializing", zap.Int("timeout in seconds", initialBCTimeout)) //DEBUG
-		initialTimer := time.NewTimer(time.Duration(initialBCTimeout * int(time.Second)))
+	if !isValidator {
 	initialBlockConsensus:
 		for {
 			select {
 			case <-s.InitialSignalCh:
-				initialTimer.Stop()
 				s.IsInitialized = true
 				s.GlobalService.Logger.Debug("node was initialized by incoming block consensus msg")
-				break initialBlockConsensus
-			case <-initialTimer.C:
-				initialTimer.Stop()
-				s.IsInitialized = true
-				s.GlobalService.Logger.Debug("initializing timeout expired")
 				break initialBlockConsensus
 			}
 		}
@@ -111,6 +101,13 @@ func (s *InternalService) Processing() {
 		round := 0
 		s.GlobalService.Logger.Debug("start loop,round = 0") // DEBUG
 		time.Sleep(1 * time.Second)                          //DEBUG
+
+		//clean block candidate collection at round = 0
+		err, _ := s.Storage.Remove(BlockCandidatesCol, bson.M{}, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("process - clean blockCandidates collection", zap.Error(err))
+			continue
+		}
 
 		// get last block from blockchain collection or create initial block
 		block, err := s.getLastBlockFromBlockChain(storageToken, saiBtcAddress)
@@ -181,7 +178,7 @@ func (s *InternalService) Processing() {
 			}
 			for _, msg := range msgs {
 				// check if consensus message sender is from trusted validators list
-				err = checkConsensusMsgSender(s.TrustedValidators, msg)
+				err = checkConsensusMsgSender(s.Validators, msg)
 				if err != nil {
 					s.GlobalService.Logger.Error("process - round != 0 - check consensus message sender", zap.Error(err))
 					continue
@@ -301,7 +298,7 @@ func (s *InternalService) getLastBlockFromBlockChain(storageToken string, saiBtc
 			Service.GlobalService.Logger.Error("process - get last block from blockchain - extract data from response", zap.Error(err))
 			return nil, err
 		}
-		s.GlobalService.Logger.Sugar().Debugf("get last block data : %s", string(data))
+		//		s.GlobalService.Logger.Sugar().Debugf("get last block data : %s", string(data))
 		err = json.Unmarshal(data, &blocks)
 		if err != nil {
 			s.GlobalService.Logger.Error("handlers - process - unmarshal result of last block from blockchain collection", zap.Error(err))
@@ -309,7 +306,7 @@ func (s *InternalService) getLastBlockFromBlockChain(storageToken string, saiBtc
 		}
 		block := blocks[0]
 		block.Block.Number++
-		s.GlobalService.Logger.Sugar().Debugf("Got last block from blockchain collection : %+v\n", block) //DEBUG
+		s.GlobalService.Logger.Debug("Got last block from blockchain collection", zap.Int("block number", block.Block.Number)) //DEBUG
 
 		return block, nil
 	}
@@ -503,7 +500,7 @@ func (s *InternalService) broadcastMsg(msg interface{}, saiP2Paddress string) er
 	// 	return fmt.Errorf("Wrong status code : %d", resp.StatusCode)
 	// }
 
-	s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG                                                       //DEBUG
+	//s.GlobalService.Logger.Sugar().Debugf("broadcasting - success, message : %+v", msg) // DEBUG                                                       //DEBUG
 	return nil
 }
 
@@ -519,10 +516,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 		},
 	}
 
-	for _, tx := range txMsgs {
-		newBlock.Block.Messages[tx.ExecutedHash] = tx
-	}
-
 	blockHash, err := newBlock.Block.GetHash()
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - count hash of new block", zap.Error(err))
@@ -532,7 +525,6 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.Block.BlockHash = blockHash
 
 	btcResp, err := utils.SignMessage(newBlock, saiBTCaddress, s.BTCkeys.Private)
-
 	if err != nil {
 		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - sign message", zap.Error(err))
 		return nil, err
@@ -543,43 +535,61 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	newBlock.Block.SenderSignature = btcResp.Signature
 	newBlock.Signatures = append(newBlock.Signatures, btcResp.Signature)
 
-	// check if we have already such block candidate
-	blockCandidate, err := s.getBlockCandidate(newBlock.BlockHash, storageToken)
-	if err != nil {
-		s.GlobalService.Logger.Error("process - round == 7 - form and save new block - get block candidate", zap.Error(err))
-		return nil, err
-	}
-
-	// if there is no such blockCandidate, save block to BlockCandidate collection
-	if blockCandidate == nil {
-		err, _ := s.Storage.Put(BlockCandidatesCol, newBlock, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
-			return nil, err
-		}
-
-	} else { // else, add vote and signature and save to blockchain
-		s.GlobalService.Logger.Debug("found block candidate with formed block hash", zap.String("hash", newBlock.BlockHash))
-		newBlock.Votes = newBlock.Votes + blockCandidate.Votes
-		newBlock.Signatures = append(newBlock.Signatures, blockCandidate.Signatures...)
-
-		err, _ = s.Storage.Remove(BlockCandidatesCol, bson.M{"hash": newBlock.BlockHash}, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - remove block from block candidates", zap.Error(err))
-			return nil, err
-		}
-		err, _ = s.Storage.Put(blockchainCol, newBlock, storageToken)
-		if err != nil {
-			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put block to blockchain collection", zap.Error(err))
-			return nil, err
-		}
-	}
-
 	for _, tx := range txMsgs {
-		err, _ := s.Storage.Update("MessagesPool", bson.M{"message_hash": tx.MessageHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
+		err, _ := s.Storage.Update("MessagesPool", bson.M{"executed_hash": tx.ExecutedHash}, bson.M{"block_hash": newBlock.BlockHash, "block_number": newBlock.Block.Number}, storageToken)
 		if err != nil {
 			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - update tx blockhash", zap.Error(err))
 			return nil, err
+		}
+		tx.BlockHash = newBlock.BlockHash
+		tx.BlockNumber = newBlock.Block.Number
+	}
+
+	for _, tx := range txMsgs {
+		newBlock.Block.Messages[tx.ExecutedHash] = tx
+	}
+
+	requiredVotes := math.Ceil(float64(len(s.Validators)) * 7 / 10)
+
+	if float64(newBlock.Votes) >= requiredVotes {
+		err, _ := s.Storage.Put("Blockchain", newBlock, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("handleBlockConsensusMsg - blockHash = msgBlockHash - insert block to BlockCandidates collection", zap.Error(err))
+			return nil, err
+		}
+	} else {
+		// check if we have already such block candidate
+		blockCandidate, err := s.getBlockCandidate(newBlock.BlockHash, storageToken)
+		if err != nil {
+			s.GlobalService.Logger.Error("process - round == 7 - form and save new block - get block candidate", zap.Error(err))
+			return nil, err
+		}
+
+		// if there is no such blockCandidate, save block to BlockCandidate collection
+		if blockCandidate == nil {
+			s.GlobalService.Logger.Debug("process - from new block - blockcandidate not found")
+			err, _ := s.Storage.Put(BlockCandidatesCol, newBlock, storageToken)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
+				return nil, err
+			}
+		} else { // else, add vote and signature and save to blockchain
+			s.GlobalService.Logger.Debug("found block candidate with formed block hash", zap.String("hash", newBlock.BlockHash))
+			newBlock.Votes = newBlock.Votes + blockCandidate.Votes
+			newBlock.Signatures = append(newBlock.Signatures, blockCandidate.Signatures...)
+
+			if float64(newBlock.Votes) >= requiredVotes {
+				err, _ = s.Storage.Put(blockchainCol, newBlock, storageToken)
+				if err != nil {
+					s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put block to blockchain collection", zap.Error(err))
+					return nil, err
+				}
+			}
+			err, _ := s.Storage.Put(BlockCandidatesCol, newBlock, storageToken)
+			if err != nil {
+				s.GlobalService.Logger.Error("process - round == 7 - form and save new block - put to BlockCandidate collection", zap.Error(err))
+				return nil, err
+			}
 		}
 	}
 
@@ -592,6 +602,7 @@ func (s *InternalService) formAndSaveNewBlock(previousBlock *models.BlockConsens
 	s.GlobalService.Logger.Sugar().Debugf(" formed new block to save: %+v\n", newBlock) //DEBUG
 
 	return newBlock, nil
+
 }
 
 // update votes to zero for transaction message
@@ -641,7 +652,7 @@ func (s *InternalService) updateTxMsgVotes(hash, storageToken string, round int)
 
 // get messages with certain number of votes
 func (s *InternalService) getTxMsgsWithCertainNumberOfVotes(storageToken string, round int) ([]*models.TransactionMessage, error) {
-	requiredVotes := math.Ceil(float64(len(s.TrustedValidators)) * float64(round) * 10 / 100)
+	requiredVotes := math.Ceil(float64(len(s.Validators)) * float64(round) * 10 / 100)
 	filterGte := bson.M{"votes." + strconv.Itoa(round): bson.M{"$gte": requiredVotes}}
 	filteredTx := make([]*models.TransactionMessage, 0)
 	txMsgs := make([]*models.TransactionMessage, 0)

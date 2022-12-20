@@ -91,7 +91,6 @@ func GetConnectedNodesAddresses(saiP2Paddress string, blacklist []string) ([]str
 // parse connected addresses from p2p node
 func ParseAddresses(body string) (addresses []string, err error) {
 	s := strings.TrimPrefix(body, "Connected:\n")
-	log.Println("prefix trimmed : ", s)
 
 	addressesSplitted := strings.Split(s, "In Progress Queue:")
 	if len(addressesSplitted) != 2 {
@@ -99,15 +98,11 @@ func ParseAddresses(body string) (addresses []string, err error) {
 		return nil, errors.New("addresses was not found")
 	}
 
-	log.Println("suffix trimmed : ", addressesSplitted[0])
-
 	addressesWithNumber := strings.Split(addressesSplitted[0], "\n")
-	log.Println("addresses with number : ", addressesWithNumber)
 
 	for _, addressWithNumber := range addressesWithNumber {
 		addressSlice := strings.Split(addressWithNumber, "=")
 		if len(addressSlice) != 2 {
-			log.Println("wrong address : ", addressWithNumber)
 			continue
 		} else {
 			addresses = append(addresses, addressSlice[1])

@@ -132,6 +132,7 @@ func (p *Proxy) ParseAddresses(body string) (addresses []string, err error) {
 }
 
 func (p *Proxy) sendDirectMsg(syncResp *SyncResponse, address string) error {
+	p.Logger.Debug("sending direct msg to p2p", zap.String("address", address))
 	data, err := json.Marshal(syncResp)
 	if err != nil {
 		return fmt.Errorf(" marshal request : %w", err)
@@ -160,6 +161,7 @@ func (p *Proxy) sendDirectMsg(syncResp *SyncResponse, address string) error {
 	if resp.StatusCode != 200 {
 		return fmt.Errorf("send post request wrong response status code : %d", resp.StatusCode)
 	}
+	p.Logger.Debug("direct msg was sent via p2p", zap.String("p2p address", p.Config.P2pHost+p.Config.P2pPort), zap.Int("response status code", resp.StatusCode), zap.Any("msg", syncResp))
 
 	return nil
 }
@@ -170,6 +172,7 @@ func (p *Proxy) detectMsgType(body io.ReadCloser) (interface{}, error) {
 	if err != nil {
 		return nil, fmt.Errorf("read body : %w", err)
 	}
+	p.Logger.Debug("detect msg", zap.String("msg", string(data)))
 
 	m := make(map[string]interface{})
 
@@ -178,34 +181,34 @@ func (p *Proxy) detectMsgType(body io.ReadCloser) (interface{}, error) {
 		return nil, fmt.Errorf("unmarshal body : %w", err)
 	}
 
-	if m["block_number_to"] != 0 && m["address"] != "" {
+	p.Logger.Debug("detect msg", zap.Any("msg", m))
+
+	switch m["type"] {
+	case SyncRequestType:
 		syncReq := SyncRequest{}
 		err = json.Unmarshal(data, &syncReq)
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal body to syncRequest: %w", err)
 		}
 		return &syncReq, nil
-	} else if m["link"] != "" {
+	case SyncResponseType:
 		syncResp := SyncResponse{}
 		err = json.Unmarshal(data, &syncResp)
 		if err != nil {
 			return nil, fmt.Errorf("unmarshal body to syncResp: %w", err)
 		}
 		return &syncResp, nil
-	} else {
+	default:
 		p.Logger.Error(errWrongMsgType.Error(), zap.Any("msg", m))
 		return nil, errWrongMsgType
 	}
 }
 
 func (p *Proxy) sendSyncResponseMsg(msg *SyncResponse) error {
-	data, err := json.Marshal(msg)
-	if err != nil {
-		return fmt.Errorf("marshal msg : %w", err)
-	}
+	msg.Type = SyncResponseType
 	req := jsonRequestType{
 		Method: "GetMissedBlocksResponse",
-		Data:   data,
+		Data:   msg,
 	}
 
 	sendData, err := json.Marshal(req)
