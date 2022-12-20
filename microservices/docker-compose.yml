@@ -55,3 +55,14 @@ services:
       - "8112:8112"
     volumes:
       - ./saiP2p/build/p2p_lin64.properties:/srv/p2p_lin64.properties
+
+  sai-vm1:
+    build:
+      context: ./saiVM1
+      dockerfile: Dockerfile
+    ports:
+      - "8009:8009"
+      - "8089:8089"
+      - "8099:8099"
+    volumes:
+      - ./saiVM1/build/config.yml:/srv/config.yml

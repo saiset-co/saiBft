@@ -11,10 +11,12 @@ build:
 service:
 #	cd ./src/saiStorage && go mod tidy && go build -o ../../microservices/saiStorage/build/sai-storage
 	cd ./src/saiBft && go mod tidy && go build -o ../../microservices/saiBft/build/sai-bft
+#	cd ./src/saiVM1 && go mod tidy && go build -o ../../microservices/saiVM1/build/sai-vm1
 #	cd ./src/saiBTC && go mod tidy && go build -o ../../microservices/saiBtc/build/sai-btc
 	cd ./src/saiP2pProxy && go mod tidy && go build -o ../../microservices/saiP2pProxy/build/sai-p2p
 	cp ./src/saiP2pProxy/config.yml ./microservices/saiP2pProxy/build/config.yml
 	cp ./src/saiBft/config.yml ./microservices/saiBft/build/config.yml
+#	cp ./src/saiVM1/config.yml ./microservices/saiVM1/build/config.yml
 #	cp ./src/saiBft/btc_keys.json ./microservices/saiBft/build/btc_keys.json
 #	cp ./src/saiBTC/saibtc.config ./microservices/saiBtc/build/saibtc.config
 #	cp ./src/saiStorage/config.json ./microservices/saiStorage/build/config.json
