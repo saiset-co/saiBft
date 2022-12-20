@@ -45,6 +45,10 @@ func (s *InternalService) Processing() {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
 	}
 
+	saiVM1address, ok := s.GlobalService.Configuration["saiVM1_Address"].(string)
+	if !ok {
+		s.GlobalService.Logger.Fatal("processing - wrong type of saiVM1 address value from config")
+	}
 	s.GlobalService.Logger.Sugar().Debugf("starting processing") //DEBUG
 
 	// for tests
@@ -127,7 +131,7 @@ func (s *InternalService) Processing() {
 			// validate/execute each tx msg, update hash and votes
 			if len(transactions) != 0 {
 				for _, tx := range transactions {
-					err = s.validateExecuteTransactionMsg(tx, saiBtcAddress, storageToken)
+					err = s.validateExecuteTransactionMsg(tx, saiBtcAddress, saiVM1address, storageToken)
 					if err != nil {
 						continue
 					}
@@ -382,8 +386,15 @@ func (s *InternalService) getZeroVotedTransactions(storageToken string) ([]*mode
 	return filteredTx, nil
 }
 
+func (s *InternalService) callVM1(msg *models.TransactionMessage, saiVM1Address string) *models.TransactionMessage {
+	msg.VmProcessed = true
+	msg.VmResponse, msg.VmResult = utils.SendHttpRequest(saiVM1Address, msg)
+
+	return msg
+}
+
 // validate/execute each message, update message and hash and vote for valid messages
-func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionMessage, saiBTCaddress, storageToken string) error {
+func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionMessage, saiBTCaddress, saiVM1address, storageToken string) error {
 	s.GlobalService.Logger.Sugar().Debugf("Handling transaction : %+v", msg) //DEBUG
 
 	err := utils.ValidateSignature(msg, saiBTCaddress, msg.Tx.SenderAddress, msg.Tx.SenderSignature)
@@ -392,9 +403,7 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 		return err
 	}
 
-	// dummy vm result values after executing at vm
-	msg.VmResult = true
-	msg.VmResponse = "vmResponse"
+	msg = s.callVM1(msg, saiVM1address)
 
 	err = msg.GetExecutedHash()
 	if err != nil {
@@ -404,7 +413,7 @@ func (s *InternalService) validateExecuteTransactionMsg(msg *models.TransactionM
 
 	msg.Votes[0]++
 	filter := bson.M{"message_hash": msg.MessageHash}
-	update := bson.M{"votes": msg.Votes, "vm_processed": true, "vm_result": msg.VmResult, "vm_response": msg.VmResponse, "executed_hash": msg.ExecutedHash}
+	update := bson.M{"votes": msg.Votes, "vm_processed": msg.VmProcessed, "vm_result": msg.VmResult, "vm_response": msg.VmResponse, "executed_hash": msg.ExecutedHash}
 	err, _ = s.Storage.Update("MessagesPool", filter, update, storageToken)
 	if err != nil {
 		Service.GlobalService.Logger.Error("process - ValidateExecuteTransactionMsg - update transactions in storage", zap.Error(err))

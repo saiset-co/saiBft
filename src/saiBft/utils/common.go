@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/iamthe1whoknocks/bft/models"
 )
@@ -56,4 +58,36 @@ func GetOutboundIP() string {
 	json.Unmarshal(body, &ip)
 
 	return ip.Query
+}
+
+func SendHttpRequest(url string, payload interface{}) (interface{}, bool) {
+	data, err := json.Marshal(payload)
+	if err != nil {
+		fmt.Println("payload marshal error", err)
+		return nil, false
+	}
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
+
+	if err != nil {
+		fmt.Println("Call VM error: ", err)
+		return nil, false
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+
+	if err != nil {
+		fmt.Println("Call VM error: ", err)
+		return nil, false
+	}
+
+	defer resp.Body.Close()
+	_ = time.AfterFunc(5*time.Second, func() {
+		resp.Body.Close()
+	})
+	body, _ := ioutil.ReadAll(resp.Body)
+	return body, true
 }
