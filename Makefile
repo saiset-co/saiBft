@@ -46,8 +46,14 @@ logs:
 logc:
 	docker-compose -f ./microservices/docker-compose.yml logs -f sai-contract-explorer
 
+logv:
+	docker-compose -f ./microservices/docker-compose.yml logs -f sai-vm1
+
 sha:
 	docker-compose -f ./microservices/docker-compose.yml run --rm sai-auth sh
+
+shv:
+	docker-compose -f ./microservices/docker-compose.yml run --rm sai-vm1 sh
 
 shb:
 	docker-compose -f ./microservices/docker-compose.yml run --rm sai-bft sh
