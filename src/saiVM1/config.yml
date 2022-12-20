@@ -1,0 +1,9 @@
+common:
+  socket:
+    port: 8009
+  http:
+    enabled: true
+    port: 8089
+  ws:
+    enabled: true
+    port: 8099
