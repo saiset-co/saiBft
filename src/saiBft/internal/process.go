@@ -45,7 +45,7 @@ func (s *InternalService) Processing() {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiP2P address value from config")
 	}
 
-	saiVM1address, ok := s.GlobalService.Configuration["saiVM1_Address"].(string)
+	saiVM1address, ok := s.GlobalService.Configuration["saiVM1_address"].(string)
 	if !ok {
 		s.GlobalService.Logger.Fatal("processing - wrong type of saiVM1 address value from config")
 	}
